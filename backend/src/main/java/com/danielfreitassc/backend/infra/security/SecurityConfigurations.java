@@ -38,12 +38,14 @@ public class SecurityConfigurations {
                 )
                 .authorizeHttpRequests(authorize -> authorize
 
-                .requestMatchers(HttpMethod.POST,"/api/v1/users").hasRole("ADMIN")
+                .requestMatchers(HttpMethod.POST,"/api/v1/users").permitAll()
+                .requestMatchers(HttpMethod.POST,"/api/v1/users/{id}/activate").hasRole("ADMIN")
                 .requestMatchers(HttpMethod.GET,"/api/v1/users").hasRole("ADMIN")
                 .requestMatchers(HttpMethod.GET,"/api/v1/users/{id}").hasRole("ADMIN")
                 .requestMatchers(HttpMethod.PATCH,"/api/v1/users/{id}").hasRole("ADMIN")
                 .requestMatchers(HttpMethod.DELETE,"/api/v1/users/{id}").hasRole("ADMIN")
 
+                .requestMatchers(HttpMethod.GET,"/api/v1/auth/me").hasRole("ADMIN")
                 .requestMatchers(HttpMethod.POST, "/api/v1/auth/login").permitAll()
                 
                 .requestMatchers("/error").anonymous()

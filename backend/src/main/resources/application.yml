@@ -17,8 +17,8 @@ api:
 
 user:
     mock:
-        username: ${ADMIN_USERNAME:admin}
-        password: ${ADMIN_PASSWORD:admin}
+        username: ${ADMIN_USERNAME:admin@admin.com}
+        password: ${ADMIN_PASSWORD:Senha12345}
 
 server:
     port: 8080

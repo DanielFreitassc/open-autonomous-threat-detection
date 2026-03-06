@@ -1,6 +1,7 @@
 package com.danielfreitassc.backend.services;
 
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.boot.CommandLineRunner; 
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.stereotype.Component;
 
@@ -8,37 +9,46 @@ import com.danielfreitassc.backend.models.user.UserEntity;
 import com.danielfreitassc.backend.models.user.UserRole;
 import com.danielfreitassc.backend.repositories.user.UserRepository;
 
-import jakarta.annotation.PostConstruct;
+import org.springframework.core.annotation.Order; 
+
 import lombok.RequiredArgsConstructor;
 
 @Component
 @RequiredArgsConstructor
-public class AdminUserInitializer {
+@Order(2)
+public class AdminUserInitializer implements CommandLineRunner {
 
     private final UserRepository userRepository;
     private final UserService userService;
+
     @Value("${user.mock.username}")
     private String adminUsername;
 
     @Value("${user.mock.password}")
     private String adminPassword;
 
-    @PostConstruct
-    public void init() {
-        if (!userService.existsByEmail(adminUsername)) {
-            String encryptedPassword = new BCryptPasswordEncoder().encode(adminPassword);
+    @Override
+    public void run(String... args) throws Exception {
+        System.out.println("Executando AdminUserInitializer...");
 
-            //Conta admin
-            UserEntity admin = new UserEntity();
-            admin.setName("Administrador");
-            admin.setUsername(adminUsername);
-            admin.setPassword(encryptedPassword);
-            admin.setRole(UserRole.ADMIN);
-            userRepository.save(admin);
-            
-            System.out.println("Admin user created.");
-        } else {
-            System.out.println("Admin user already exists.");
+        try {
+            if (!userService.existsByEmail(adminUsername)) {
+                String encryptedPassword = new BCryptPasswordEncoder().encode(adminPassword);
+
+                UserEntity admin = new UserEntity();
+                admin.setName("Administrador");
+                admin.setEmail(adminUsername);
+                admin.setPassword(encryptedPassword);
+                admin.setRole(UserRole.ADMIN);
+                admin.setActive(true);
+                userRepository.save(admin);
+            } else {
+                System.out.println("Admin criado");
+            }
+
+        } finally {
+            System.out.println("Admin concluído.");
         }
+
     }
 }

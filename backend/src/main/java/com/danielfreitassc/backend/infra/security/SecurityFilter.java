@@ -34,7 +34,9 @@ public class SecurityFilter extends OncePerRequestFilter {
             throws ServletException, IOException {
 
         String path = request.getServletPath();
-        boolean isPublicEndpoint = (path.equals("/api/v1/auth/login") && request.getMethod().equals("POST"));
+        boolean isPublicEndpoint =
+                (path.equals("/api/v1/users") && request.getMethod().equals("POST")) ||
+                (path.equals("/api/v1/auth/login") && request.getMethod().equals("POST"));
 
         var token = recoverToken(request);
 
@@ -43,7 +45,7 @@ public class SecurityFilter extends OncePerRequestFilter {
             try {
                 var userId = tokenService.validateToken(token);
                 UserDetails user = userRepository.findById(UUID.fromString(userId))
-                        .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Usuário deste token não encontrado"));
+                        .orElseThrow(() -> new ResponseStatusException(HttpStatus.UNAUTHORIZED, "Token expirado"));
 
                 var authentication = new UsernamePasswordAuthenticationToken(user, null, user.getAuthorities());
                 SecurityContextHolder.getContext().setAuthentication(authentication);
@@ -57,9 +59,9 @@ public class SecurityFilter extends OncePerRequestFilter {
                     new AuthenticationException("Formato do token inválido") {});
                 return;
             } catch (ResponseStatusException ex) {
-                response.setStatus(HttpStatus.NOT_FOUND.value());
+                response.setStatus(HttpStatus.UNAUTHORIZED.value());
                 response.setContentType("application/json");
-                response.getWriter().write("{\"message\":\"Usuário deste token não encontrado\"}");
+                response.getWriter().write("{\"message\":\"Token expirado\"}");
                 return;
             }
         }

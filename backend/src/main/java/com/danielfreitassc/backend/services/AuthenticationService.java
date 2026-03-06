@@ -1,14 +1,14 @@
 package com.danielfreitassc.backend.services;
 
+import java.util.Optional;
+
 import org.springframework.http.HttpStatus;
-import org.springframework.security.authentication.AuthenticationManager;
-import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
-import org.springframework.security.core.userdetails.UserDetails;
+import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.web.server.ResponseStatusException;
 
-import com.danielfreitassc.backend.dtos.user.LoginRequestDto;
-import com.danielfreitassc.backend.dtos.user.LoginResponseDto;
+import com.danielfreitassc.backend.dtos.user.AuthRequestDto;
+import com.danielfreitassc.backend.dtos.user.AuthResponseDto;
 import com.danielfreitassc.backend.infra.security.TokenService;
 import com.danielfreitassc.backend.models.user.UserEntity;
 import com.danielfreitassc.backend.repositories.user.UserRepository;
@@ -18,39 +18,60 @@ import lombok.RequiredArgsConstructor;
 @Service
 @RequiredArgsConstructor
 public class AuthenticationService {
-    private final AuthenticationManager authenticationManager;
+    
+    private static final int MAX_LOGIN_ATTEMPTS = 4;
+
+    private final PasswordEncoder passwordEncoder;
     private final TokenService tokenService;
     private final UserRepository userRepository;
 
-    public LoginResponseDto login(LoginRequestDto loginRequestDto) {
-        UserDetails userDetails = userRepository.findByUsername(loginRequestDto.username())
-            .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND,"Usuário não encontrado!"));
+    public AuthResponseDto login(AuthRequestDto authRequestDto) {
+        UserEntity user = findUserOrThrow(authRequestDto);
 
-        if (!(userDetails instanceof UserEntity)) {
-            throw new ResponseStatusException(HttpStatus.UNAUTHORIZED,"Usuário não encontrado.");
-        }
+        validateUserStatus(user);
 
-        UserEntity user = (UserEntity) userDetails;
-        if(user.isAccountLocked()) {
-            throw new ResponseStatusException(HttpStatus.FORBIDDEN,"A conta está bloqueada. Por favor, tente novamente mais tarde.");
-        }
-
-        try {
-            var usernamePassword = new UsernamePasswordAuthenticationToken(loginRequestDto.username(), loginRequestDto.password());
-            authenticationManager.authenticate(usernamePassword);
-            var token = tokenService.generateToken(user);
+        if (passwordEncoder.matches(authRequestDto.password(), user.getPassword())) {
             user.resetLoginAttempts();
             userRepository.save(user);
-
-            return new LoginResponseDto(token);
-        } catch (Exception e) {
-            user.incrementLoginAttempts();
-            if(user.getLoginAttempts() >= 4) {
-                user.lockAccount();
-            }
-            userRepository.save(user);
-            int remainingAttempts = 4 - user.getLoginAttempts();
-            throw new ResponseStatusException(HttpStatus.UNAUTHORIZED,"Senha incorreta: " + remainingAttempts + " tentativas restantes.");
+            String token = tokenService.generateToken(user);
+            return new AuthResponseDto(token);
+        } else {
+            handleFailedLogin(user);
+            return null;
         }
     }
-}   
+
+    private UserEntity findUserOrThrow(AuthRequestDto dto) {
+        Optional<UserEntity> user = userRepository.findByEmail(dto.email());
+        if(user.isEmpty()) {
+            throw new ResponseStatusException(HttpStatus.UNAUTHORIZED,"E-mail ou senha inválidos.");
+        }
+        return user.get();
+    }
+
+    private void validateUserStatus(UserEntity user) {
+        if (user.isAccountLocked()) {
+            throw new ResponseStatusException(HttpStatus.UNAUTHORIZED,"A conta está bloqueada. Tente novamente mais tarde.");
+        }
+
+        if (!user.isActive()) {
+            throw new ResponseStatusException(HttpStatus.UNAUTHORIZED,"Sua conta ainda não está ativada.");
+        }
+    }
+
+    private void handleFailedLogin(UserEntity user) {
+        user.incrementLoginAttempts();
+
+        if (user.getLoginAttempts() >= MAX_LOGIN_ATTEMPTS) {
+            user.lockAccount();
+        }
+
+        userRepository.save(user);
+
+        if (user.isAccountLocked()) {
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN,"Conta bloqueada por excesso de tentativas.");
+        } else {
+            throw new ResponseStatusException(HttpStatus.UNAUTHORIZED,"E-mail ou senha inválidos.");
+        }
+    }
+} 
