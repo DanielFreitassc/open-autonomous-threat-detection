@@ -35,14 +35,12 @@ public class ModuleService {
         moduleEntity.setPassword(passwordEncoder.encode(moduleRequestDto.password()));
 
         moduleEntity.setRole(ModuleRole.MODULE);
-        moduleEntity.setActive(true);
         moduleRepository.save(moduleEntity);
         return moduleMapper.entityToDto(moduleEntity);
     } 
 
     public Page<ModuleResponseDto> getAll(Pageable pageable) {
-        return moduleRepository.findAllByActiveTrue(pageable)
-                            .map(moduleMapper::entityToDto);
+        return moduleRepository.findAll(pageable).map(moduleMapper::entityToDto);
     }
     
     public ModuleResponseDto getModule(UUID id) {

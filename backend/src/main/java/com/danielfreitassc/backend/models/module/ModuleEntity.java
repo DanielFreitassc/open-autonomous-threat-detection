@@ -41,8 +41,6 @@ public class ModuleEntity implements UserDetails {
 
     private String password;
 
-    private boolean active;
-
     @CreationTimestamp
     private LocalDateTime createdAt;
 

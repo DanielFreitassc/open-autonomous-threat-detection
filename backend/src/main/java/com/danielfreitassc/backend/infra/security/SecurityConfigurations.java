@@ -55,6 +55,12 @@ public class SecurityConfigurations {
                 .requestMatchers(HttpMethod.POST, "/api/v1/auth/login").permitAll()
                 .requestMatchers(HttpMethod.POST, "/api/v1/auth/login-modules").permitAll()
                 
+                .requestMatchers(HttpMethod.POST,"/api/v1/anomalies").hasRole("ADMIN")
+                .requestMatchers(HttpMethod.GET,"/api/v1/anomalies").hasRole("ADMIN")
+                .requestMatchers(HttpMethod.GET,"/api/v1/anomalies/{id}").hasRole("ADMIN")
+                .requestMatchers(HttpMethod.PUT,"/api/v1/anomalies/{id}").hasRole("ADMIN")
+                .requestMatchers(HttpMethod.DELETE,"/api/v1/anomalies/{id}").hasRole("ADMIN")
+
                 .requestMatchers("/error").anonymous()
                 .anyRequest().denyAll()
 

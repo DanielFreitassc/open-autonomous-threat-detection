@@ -1,7 +1,9 @@
 package com.danielfreitassc.backend.models.anomaly;
 
-import java.time.Instant;
+import java.time.LocalDateTime;
 import java.util.UUID;
+
+import org.hibernate.annotations.CreationTimestamp;
 
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
@@ -33,5 +35,7 @@ public class AnomalyEntity {
     private String description;
     @Column(columnDefinition = "TEXT")
     private String fullLog;
-    private Instant createdAt;
+    private LocalDateTime timestamp;
+    @CreationTimestamp
+    private LocalDateTime createdAt;
 }

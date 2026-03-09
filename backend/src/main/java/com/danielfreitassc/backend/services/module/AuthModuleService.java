@@ -46,10 +46,6 @@ public class AuthModuleService {
         if (moduleEntity.isAccountLocked()) {
             throw new ResponseStatusException(HttpStatus.UNAUTHORIZED,"A conta está bloqueada. Tente novamente mais tarde.");
         }
-
-        if (!moduleEntity.isActive()) {
-            throw new ResponseStatusException(HttpStatus.UNAUTHORIZED,"Sua conta ainda não está ativada.");
-        }
     }
 
     private void handleFailedLogin(ModuleEntity moduleEntity) {
