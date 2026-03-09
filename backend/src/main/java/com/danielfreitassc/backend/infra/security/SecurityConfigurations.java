@@ -44,9 +44,16 @@ public class SecurityConfigurations {
                 .requestMatchers(HttpMethod.GET,"/api/v1/users/{id}").hasRole("ADMIN")
                 .requestMatchers(HttpMethod.PATCH,"/api/v1/users/{id}").hasRole("ADMIN")
                 .requestMatchers(HttpMethod.DELETE,"/api/v1/users/{id}").hasRole("ADMIN")
+                
+                .requestMatchers(HttpMethod.POST,"/api/v1/modules").hasRole("ADMIN")
+                .requestMatchers(HttpMethod.GET,"/api/v1/modules").hasRole("ADMIN")
+                .requestMatchers(HttpMethod.PATCH,"/api/v1/modules/{id}").hasRole("ADMIN")
+                .requestMatchers(HttpMethod.DELETE,"/api/v1/modules/{id}").hasRole("ADMIN")
+                .requestMatchers(HttpMethod.GET,"/api/v1/modules/{id}").hasRole("ADMIN")
 
                 .requestMatchers(HttpMethod.GET,"/api/v1/auth/me").hasRole("ADMIN")
                 .requestMatchers(HttpMethod.POST, "/api/v1/auth/login").permitAll()
+                .requestMatchers(HttpMethod.POST, "/api/v1/auth/login-modules").permitAll()
                 
                 .requestMatchers("/error").anonymous()
                 .anyRequest().denyAll()

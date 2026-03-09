@@ -1,4 +1,4 @@
-package com.danielfreitassc.backend.services;
+package com.danielfreitassc.backend.services.user;
 
 import java.util.Optional;
 import java.util.UUID;

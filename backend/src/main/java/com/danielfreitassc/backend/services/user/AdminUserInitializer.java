@@ -1,4 +1,4 @@
-package com.danielfreitassc.backend.services;
+package com.danielfreitassc.backend.services.user;
 
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.CommandLineRunner; 

@@ -1,4 +1,4 @@
-package com.danielfreitassc.backend.services;
+package com.danielfreitassc.backend.services.user;
 
 import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.security.core.userdetails.UserDetailsService;

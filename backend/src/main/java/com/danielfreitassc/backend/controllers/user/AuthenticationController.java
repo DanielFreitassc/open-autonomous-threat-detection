@@ -11,8 +11,8 @@ import com.danielfreitassc.backend.dtos.user.AuthRequestDto;
 import com.danielfreitassc.backend.dtos.user.AuthResponseDto;
 import com.danielfreitassc.backend.dtos.user.UserResponseDto;
 import com.danielfreitassc.backend.models.user.UserEntity;
-import com.danielfreitassc.backend.services.AuthMeService;
-import com.danielfreitassc.backend.services.AuthenticationService;
+import com.danielfreitassc.backend.services.user.AuthMeService;
+import com.danielfreitassc.backend.services.user.AuthenticationService;
 
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
