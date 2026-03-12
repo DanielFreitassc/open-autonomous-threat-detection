@@ -5,9 +5,9 @@ import java.util.UUID;
 
 import org.springframework.data.jpa.repository.JpaRepository;
 
-import com.danielfreitassc.backend.models.anomaly.AnomalyEntity;
+import com.danielfreitassc.backend.models.anomaly.SourcersEntity;
 
-public interface AnomalyRepository extends JpaRepository<AnomalyEntity, UUID> {
-    Optional<AnomalyEntity> findByEventsEntityId(UUID eventId);
+public interface SourcersRepository extends JpaRepository<SourcersEntity, UUID> {
+    Optional<SourcersEntity> findByEventsEntityId(UUID eventId);
     void deleteByEventsEntityId(UUID eventId);
 }

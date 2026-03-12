@@ -1,13 +1,11 @@
 package com.danielfreitassc.backend.models.anomaly;
 
-import java.time.LocalDateTime;
 import java.util.UUID;
-
-import org.hibernate.annotations.CreationTimestamp;
 
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.GeneratedValue;
+import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
 import jakarta.persistence.JoinColumn;
 import jakarta.persistence.OneToOne;
@@ -17,30 +15,20 @@ import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
 
-@Getter
-@Setter
+
+@Getter @Setter
 @NoArgsConstructor
 @AllArgsConstructor
-@Table(name = "anomalies")
-@Entity(name = "anomalies")
-public class AnomalyEntity {
-    
+@Table(name = "raw_logs")
+@Entity(name = "raw_logs")
+public class RawLogsEntity {
     @Id
-    @GeneratedValue
+    @GeneratedValue(strategy = GenerationType.UUID)
     private UUID id;
-    private String sourceType; 
-    private String host;
-    private String rule;
-    private Severity severity;
+    
     @OneToOne
     @JoinColumn(name = "event_id")
     private EventsEntity eventsEntity;
-    private String title;
     @Column(columnDefinition = "TEXT")
-    private String description;
-    @Column(columnDefinition = "TEXT")
-    private String fullLog;
-    private LocalDateTime timestamp;
-    @CreationTimestamp
-    private LocalDateTime createdAt;
+    private String raw;
 }

@@ -1,19 +1,21 @@
 package com.danielfreitassc.backend.dtos.anomaly;
 
 import java.time.LocalDateTime;
-import java.util.UUID;
+
+import com.danielfreitassc.backend.models.anomaly.Severity;
 
 public record AnomalyResponseDto(
-    UUID id,
+    String id,
     String sourceType,
     String host,
     String rule,
-    String severity,
+    Severity severity,
     String title,
     String description,
     String fullLog,
     LocalDateTime timestamp,
-    LocalDateTime createdAt    
+    LocalDateTime createdAt
+
 ) {
     
 }
