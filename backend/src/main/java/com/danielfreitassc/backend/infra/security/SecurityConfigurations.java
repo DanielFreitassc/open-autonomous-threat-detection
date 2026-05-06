@@ -29,42 +29,30 @@ public class SecurityConfigurations {
     @Bean
     public SecurityFilterChain securityFilterChain(HttpSecurity httpSecurity) throws Exception{
         return httpSecurity
-                .cors(cors -> cors.configurationSource(corsConfigurationSource()))
-                .csrf(csrf -> csrf.disable())
-                .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
-                .exceptionHandling(ex -> ex
-                    .authenticationEntryPoint(customAuthenticationEntryPoint)
-                    .accessDeniedHandler(customAccessDeniedHandler)
-                )
-                .authorizeHttpRequests(authorize -> authorize
-
-                .requestMatchers(HttpMethod.POST,"/api/v1/users").permitAll()
-                .requestMatchers(HttpMethod.POST,"/api/v1/users/{id}/activate").hasRole("ADMIN")
-                .requestMatchers(HttpMethod.GET,"/api/v1/users").hasRole("ADMIN")
-                .requestMatchers(HttpMethod.GET,"/api/v1/users/{id}").hasRole("ADMIN")
-                .requestMatchers(HttpMethod.PATCH,"/api/v1/users/{id}").hasRole("ADMIN")
-                .requestMatchers(HttpMethod.DELETE,"/api/v1/users/{id}").hasRole("ADMIN")
-                
-                .requestMatchers(HttpMethod.POST,"/api/v1/modules").hasRole("ADMIN")
-                .requestMatchers(HttpMethod.GET,"/api/v1/modules").hasRole("ADMIN")
-                .requestMatchers(HttpMethod.PATCH,"/api/v1/modules/{id}").hasRole("ADMIN")
-                .requestMatchers(HttpMethod.DELETE,"/api/v1/modules/{id}").hasRole("ADMIN")
-                .requestMatchers(HttpMethod.GET,"/api/v1/modules/{id}").hasRole("ADMIN")
-
-                .requestMatchers(HttpMethod.GET,"/api/v1/auth/me").hasRole("ADMIN")
+            .cors(cors -> cors.configurationSource(corsConfigurationSource()))
+            .csrf(csrf -> csrf.disable())
+            .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
+            .exceptionHandling(ex -> ex
+                .authenticationEntryPoint(customAuthenticationEntryPoint)
+                .accessDeniedHandler(customAccessDeniedHandler)
+            ).authorizeHttpRequests(authorize -> authorize
+                // Permissões públicas
+                .requestMatchers(HttpMethod.POST, "/api/v1/users").permitAll()
                 .requestMatchers(HttpMethod.POST, "/api/v1/auth/login").permitAll()
                 .requestMatchers(HttpMethod.POST, "/api/v1/auth/login-modules").permitAll()
                 
-                .requestMatchers(HttpMethod.POST,"/api/v1/anomalies").hasRole("ADMIN")
-                .requestMatchers(HttpMethod.GET,"/api/v1/anomalies").hasRole("ADMIN")
-                .requestMatchers(HttpMethod.GET,"/api/v1/anomalies/{id}").hasRole("ADMIN")
-                .requestMatchers(HttpMethod.PUT,"/api/v1/anomalies/{id}").hasRole("ADMIN")
-                .requestMatchers(HttpMethod.DELETE,"/api/v1/anomalies/{id}").hasRole("ADMIN")
-
+                // Admin endpoints
+                .requestMatchers("/api/v1/users/**").hasRole("ADMIN")
+                .requestMatchers("/api/v1/modules/**").hasRole("ADMIN")
+                .requestMatchers("/api/v1/events/**").hasRole("ADMIN")
+                .requestMatchers(HttpMethod.GET, "/api/v1/auth/me").hasRole("ADMIN")
+                
+                // Error page
                 .requestMatchers("/error").anonymous()
+                
+                // Bloquear todo o resto
                 .anyRequest().denyAll()
-
-                ).addFilterBefore(securityFilter, UsernamePasswordAuthenticationFilter.class).build();
+            ).addFilterBefore(securityFilter, UsernamePasswordAuthenticationFilter.class).build();
     }
 
     @Bean

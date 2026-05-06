@@ -10,34 +10,13 @@ import com.danielfreitassc.backend.models.anomaly.Severity;
 
 public record AnomalyRequestDto(
 
-    @NotNull(message = "Timestamp é obrigatório")
-    LocalDateTime timestamp,
-
-    @NotBlank(message = "Source é obrigatório")
-    @Size(max = 50, message = "Source deve ter no máximo 50 caracteres")
-    String sourceType,
-
-    @NotBlank(message = "Host é obrigatório")
-    @Size(max = 100, message = "Host deve ter no máximo 100 caracteres")
-    String host,
-
-    @NotBlank(message = "Rule é obrigatória")
-    @Size(max = 100, message = "Rule deve ter no máximo 100 caracteres")
-    String rule,
-
-    @NotNull(message = "Severity é obrigatória")
-    Severity severity,
-    
-    @NotBlank(message = "Title é obrigatório")
-    @Size(max = 50, message = "Title deve ter no máximo 50 caracteres")
-    String title,
-    
-    @NotBlank(message = "Title é obrigatório")
-    @Size(max = 50, message = "Title deve ter no máximo 50 caracteres")
-    String description,
-
-    @NotBlank(message = "Full log é obrigatório")
-    @Size(max = 10000, message = "Full log muito grande")
-    String fullLog
+    @NotBlank(message = "O tipo da fonte é obrigatório") String sourceType,
+    @NotBlank(message = "O host é obrigatório") String host,
+    @NotBlank(message = "A regra é obrigatória") String rule,
+    @NotNull(message = "A severidade é obrigatória") Severity severity,
+    @NotBlank(message = "O título é obrigatório") String title,
+    @Size(max = 10000, message = "A descrição deve ter no máximo 10000 caracteres") String description,
+    @Size(max = 20000, message = "O log completo deve ter no máximo 20000 caracteres") String fullLog,
+    @NotNull(message = "O timestamp é obrigatório") LocalDateTime timestamp
 
 ) {}
