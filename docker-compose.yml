@@ -1,0 +1,28 @@
+services:
+  ia-csirt-agent:
+    build:
+      context: ./agent
+      dockerfile: Dockerfile
+    container_name: ia_monitor_agent
+    stdin_open: true
+    tty: true
+    ports:
+      - "5140:5140/udp"
+    volumes:
+      - ./agent:/app
+    environment:
+      - PYTHONUNBUFFERED=1
+    restart: unless-stopped
+    # 1. Conecta o serviço à rede customizada e define o IP fixo
+    networks:
+      rede_monitoramento:
+        ipv4_address: 172.25.0.50
+
+# 2. Cria a rede com a faixa de IP (Subnet) que você quer usar
+networks:
+  rede_monitoramento:
+    name: open-autonomous-threat-detection
+    driver: bridge
+    ipam:
+      config:
+        - subnet: 172.25.0.0/16

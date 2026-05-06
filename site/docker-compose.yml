@@ -1,0 +1,26 @@
+services:
+  app:
+    build:
+      context: ./frontend-example
+      dockerfile: Dockerfile 
+    restart: always
+    networks:
+      - default
+
+  nginx:
+    build:
+      context: ./nginx
+      dockerfile: Dockerfile 
+    ports:
+      - "80:80"
+    depends_on:
+      - app
+    restart: always
+    networks:
+      - default
+      - network_agent 
+
+networks:
+  network_agent:
+    external: true
+    name: open-autonomous-threat-detection
