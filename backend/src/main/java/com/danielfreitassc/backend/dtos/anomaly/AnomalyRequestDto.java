@@ -10,8 +10,6 @@ import com.danielfreitassc.backend.models.anomaly.Severity;
 
 public record AnomalyRequestDto(
 
-    @NotBlank(message = "O tipo da fonte é obrigatório") String sourceType,
-    @NotBlank(message = "O host é obrigatório") String host,
     @NotBlank(message = "A regra é obrigatória") String rule,
     @NotNull(message = "A severidade é obrigatória") Severity severity,
     @NotBlank(message = "O título é obrigatório") String title,

@@ -44,7 +44,7 @@ public class SecurityConfigurations {
                 // Admin endpoints
                 .requestMatchers("/api/v1/users/**").hasRole("ADMIN")
                 .requestMatchers("/api/v1/modules/**").hasRole("ADMIN")
-                .requestMatchers("/api/v1/events/**").hasRole("ADMIN")
+                .requestMatchers("/api/v1/events/**").hasAnyRole("ADMIN","MODULE")
                 .requestMatchers(HttpMethod.GET, "/api/v1/auth/me").hasRole("ADMIN")
                 
                 // Error page

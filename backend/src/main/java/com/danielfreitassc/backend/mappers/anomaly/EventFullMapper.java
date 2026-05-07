@@ -21,8 +21,6 @@ public interface EventFullMapper {
         event.setType(dto.events().type());
         event.setOutcome(dto.events().outcome());
 
-        FeaturesEntity features = toFeaturesEntity(dto.features(), event);
-        
         List<HttpRequestsEntity> httpRequests = dto.httpRequests() != null 
             ? dto.httpRequests().stream()
                 .map(h -> toHttpRequestsEntity(h, event))
@@ -33,18 +31,17 @@ public interface EventFullMapper {
         SourcersEntity sourcers = toSourcersEntity(dto.sourcers(), event);
         AnomalyEntity anomaly = toAnomalyEntity(dto.anomaly(), event);
 
-        return new EventFullEntities(event, features, httpRequests, rawLogs, sourcers, anomaly);
+        // Retorna o record wrapper sem o Features
+        return new EventFullEntities(event, httpRequests, rawLogs, sourcers, anomaly);
     }
 
     @Mapping(target = "events", source = "event")
-    @Mapping(target = "features", source = "features")
     @Mapping(target = "httpRequests", source = "http")
     @Mapping(target = "rawLogs", source = "raw")
     @Mapping(target = "sourcers", source = "source")
     @Mapping(target = "anomaly", source = "anomalyEntity")
     EventFullResponseDto entitiesToResponseDto(
         EventsEntity event, 
-        FeaturesEntity features, 
         List<HttpRequestsEntity> http, 
         RawLogsEntity raw, 
         SourcersEntity source, 
@@ -53,29 +50,7 @@ public interface EventFullMapper {
 
     EventsResponseDto toEventsResponseDto(EventsEntity entity);
 
-    @Mapping(target = "event", ignore = true) 
-    FeaturesResponseDto toFeaturesResponseDto(FeaturesEntity entity);
-
-    @Mapping(target = "event", ignore = true)
-    HttpRequestsResponseDto toHttpRequestsResponseDto(HttpRequestsEntity entity);
-
-    @Mapping(target = "event", ignore = true)
-    RawLogsResponseDto toRawLogsResponseDto(RawLogsEntity entity);
-
-    @Mapping(target = "event", ignore = true)
-    SourcersResponseDto toSourcersResponseDto(SourcersEntity entity);
-
     AnomalyResponseDto toAnomalyResponseDto(AnomalyEntity entity);
-
-    default FeaturesEntity toFeaturesEntity(FeaturesRequestDto dto, EventsEntity event) {
-        if (dto == null) return null;
-        FeaturesEntity entity = new FeaturesEntity();
-        entity.setRequestRate(dto.requestRate());
-        entity.setFailedLoginCount(dto.failedLoginCount());
-        entity.setGeoDistanceKm(dto.geoDistanceKm());
-        entity.setEventsEntity(event);
-        return entity;
-    }
 
     default HttpRequestsEntity toHttpRequestsEntity(HttpRequestsRequestDto dto, EventsEntity event) {
         if (dto == null) return null;
@@ -101,9 +76,12 @@ public interface EventFullMapper {
         SourcersEntity entity = new SourcersEntity();
         entity.setService(dto.service());
         entity.setEngine(dto.engine());
-        entity.setHost(dto.host());
+        entity.setHost(dto.host()); // Novo campo
         entity.setClientIp(dto.clientIp());
         entity.setUserAgent(dto.userAgent());
+        entity.setLocation(dto.location()); // Novo campo
+        entity.setLatitude(dto.latitude()); // Novo campo
+        entity.setLongitude(dto.longitude()); // Novo campo
         entity.setEventsEntity(event);
         return entity;
     }
@@ -111,15 +89,12 @@ public interface EventFullMapper {
     default AnomalyEntity toAnomalyEntity(AnomalyRequestDto dto, EventsEntity event) {
         if (dto == null) return null;
         AnomalyEntity entity = new AnomalyEntity();
-        entity.setSourceType(dto.sourceType());
-        entity.setHost(dto.host());
         entity.setRule(dto.rule());
         entity.setSeverity(dto.severity());
         entity.setTitle(dto.title());
         entity.setDescription(dto.description());
         entity.setFullLog(dto.fullLog());
         entity.setTimestamp(dto.timestamp());
-
         entity.setEventsEntity(event); 
         
         return entity;

@@ -25,13 +25,21 @@ public class SourcersEntity {
     @Id
     @GeneratedValue(strategy = GenerationType.UUID)
     private UUID id;
+    
     @OneToOne
     @JoinColumn(name = "event_id")
     private EventsEntity eventsEntity;
+    
     private String service;
     private String engine;
     private String host;
     private String clientIp;
+    
     @Column(columnDefinition = "TEXT")
     private String userAgent;
+    
+    private String location;
+
+    private Double latitude;   
+    private Double longitude;
 }

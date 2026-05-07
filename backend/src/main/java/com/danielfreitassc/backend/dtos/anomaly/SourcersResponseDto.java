@@ -1,13 +1,17 @@
 package com.danielfreitassc.backend.dtos.anomaly;
 
+import java.util.UUID;
+
 public record SourcersResponseDto(
-    String id,
-    EventsResponseDto event,
+    UUID id,              
     String service,
     String engine,
-    String host,
+    String host,          
     String clientIp,
-    String userAgent
+    String userAgent,
+    String location,      
+    Double latitude,      
+    Double longitude      
 ) {
     
 }

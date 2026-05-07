@@ -30,7 +30,6 @@ public class EventFullService {
         EventsEntity event = entities.eventsEntity();
 
         event.setAnomaly(entities.anomaly());
-        event.setFeatures(entities.featuresEntity());
         event.setRawLogs(entities.rawLogs());
         event.setSourcers(entities.sourcers());
         event.setHttpRequests(entities.httpRequests());
@@ -50,7 +49,6 @@ public class EventFullService {
 
     @Transactional
     public EventFullResponseDto update(UUID id, EventFullRequestDto requestDto) {
-        EventsEntity existingEvent = findEventOrThrow(id);
         
         EventFullEntities newEntities = eventFullMapper.dtoToEntities(requestDto);
         EventsEntity updatedEvent = newEntities.eventsEntity();
@@ -58,7 +56,6 @@ public class EventFullService {
         updatedEvent.setId(id);
         
         updatedEvent.setAnomaly(newEntities.anomaly());
-        updatedEvent.setFeatures(newEntities.featuresEntity());
         updatedEvent.setRawLogs(newEntities.rawLogs());
         updatedEvent.setSourcers(newEntities.sourcers());
         updatedEvent.setHttpRequests(newEntities.httpRequests());
@@ -84,7 +81,6 @@ public class EventFullService {
     private EventFullResponseDto mapToResponseDto(EventsEntity event) {
         return eventFullMapper.entitiesToResponseDto(
             event, 
-            event.getFeatures(), 
             event.getHttpRequests(), 
             event.getRawLogs(), 
             event.getSourcers(), 

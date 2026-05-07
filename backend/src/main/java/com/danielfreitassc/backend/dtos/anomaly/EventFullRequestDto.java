@@ -6,7 +6,6 @@ import jakarta.validation.Valid;
 
 public record EventFullRequestDto(
     @Valid EventsRequestDto events,
-    @Valid FeaturesRequestDto features,
     @Valid List<HttpRequestsRequestDto> httpRequests,
     @Valid RawLogsRequestDto rawLogs,
     @Valid SourcersRequestDto sourcers,

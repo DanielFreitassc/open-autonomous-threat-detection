@@ -5,13 +5,19 @@ import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Size;
 
 public record SourcersRequestDto(
-    @NotNull(message = "O ID do evento é obrigatório") String eventId,
     @NotBlank(message = "O serviço é obrigatório") String service,
     @NotBlank(message = "O engine é obrigatório") String engine,
-    @NotBlank(message = "O host é obrigatório") String host,
+    
+    @NotBlank(message = "O host é obrigatório") String host, 
+    
     @NotBlank(message = "O IP do cliente é obrigatório") String clientIp,
+    
     @NotBlank(message = "O user agent é obrigatório") 
-    @Size(max = 2000, message = "O user agent deve ter no máximo 2000 caracteres") String userAgent
+    @Size(max = 2000, message = "O user agent deve ter no máximo 2000 caracteres") String userAgent,
+    
+    @NotBlank(message = "A localização é obrigatória") String location,
+    @NotNull(message = "A latitude é obrigatória") Double latitude,
+    @NotNull(message = "A longitude é obrigatória") Double longitude
 ) {
     
 }

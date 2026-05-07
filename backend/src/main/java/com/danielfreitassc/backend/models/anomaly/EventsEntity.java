@@ -35,9 +35,6 @@ public class EventsEntity {
     private AnomalyEntity anomaly;
 
     @OneToOne(mappedBy = "eventsEntity", cascade = CascadeType.ALL, orphanRemoval = true)
-    private FeaturesEntity features;
-
-    @OneToOne(mappedBy = "eventsEntity", cascade = CascadeType.ALL, orphanRemoval = true)
     private RawLogsEntity rawLogs;
 
     @OneToOne(mappedBy = "eventsEntity", cascade = CascadeType.ALL, orphanRemoval = true)
