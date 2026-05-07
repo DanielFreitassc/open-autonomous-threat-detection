@@ -139,14 +139,6 @@ export function Header() {
                         {curso.description}
                       </ListItem>
                     ))}
-                    <li className="col-span-2">
-                      <Link
-                        href="/cursos"
-                        className="flex w-full items-center justify-center rounded-md bg-secondary p-3 text-sm font-medium text-secondary-foreground hover:bg-secondary/80"
-                      >
-                        Ver todos os cursos →
-                      </Link>
-                    </li>
                   </ul>
                 </NavigationMenuContent>
               </NavigationMenuItem>
