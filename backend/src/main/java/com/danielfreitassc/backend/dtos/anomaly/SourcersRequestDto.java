@@ -1,7 +1,6 @@
 package com.danielfreitassc.backend.dtos.anomaly;
 
 import jakarta.validation.constraints.NotBlank;
-import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Size;
 
 public record SourcersRequestDto(
@@ -13,11 +12,7 @@ public record SourcersRequestDto(
     @NotBlank(message = "O IP do cliente é obrigatório") String clientIp,
     
     @NotBlank(message = "O user agent é obrigatório") 
-    @Size(max = 2000, message = "O user agent deve ter no máximo 2000 caracteres") String userAgent,
-    
-    @NotBlank(message = "A localização é obrigatória") String location,
-    @NotNull(message = "A latitude é obrigatória") Double latitude,
-    @NotNull(message = "A longitude é obrigatória") Double longitude
+    @Size(max = 2000, message = "O user agent deve ter no máximo 2000 caracteres") String userAgent
 ) {
     
 }

@@ -76,12 +76,9 @@ public interface EventFullMapper {
         SourcersEntity entity = new SourcersEntity();
         entity.setService(dto.service());
         entity.setEngine(dto.engine());
-        entity.setHost(dto.host()); // Novo campo
+        entity.setHost(dto.host());
         entity.setClientIp(dto.clientIp());
         entity.setUserAgent(dto.userAgent());
-        entity.setLocation(dto.location()); // Novo campo
-        entity.setLatitude(dto.latitude()); // Novo campo
-        entity.setLongitude(dto.longitude()); // Novo campo
         entity.setEventsEntity(event);
         return entity;
     }

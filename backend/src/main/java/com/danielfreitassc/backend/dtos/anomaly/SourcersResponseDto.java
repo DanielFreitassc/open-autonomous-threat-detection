@@ -8,10 +8,7 @@ public record SourcersResponseDto(
     String engine,
     String host,          
     String clientIp,
-    String userAgent,
-    String location,      
-    Double latitude,      
-    Double longitude      
+    String userAgent   
 ) {
     
 }

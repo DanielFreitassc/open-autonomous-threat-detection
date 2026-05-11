@@ -38,8 +38,4 @@ public class SourcersEntity {
     @Column(columnDefinition = "TEXT")
     private String userAgent;
     
-    private String location;
-
-    private Double latitude;   
-    private Double longitude;
 }
