@@ -40,7 +40,7 @@ public class EventFullService {
     }
 
     public Page<EventFullResponseDto> getAll(Pageable pageable) {
-        return eventsRepository.findAll(pageable).map(this::mapToResponseDto);
+        return eventsRepository.findByFalsePositiveFalse(pageable).map(this::mapToResponseDto);
     }
 
     public EventFullResponseDto getById(UUID id) {

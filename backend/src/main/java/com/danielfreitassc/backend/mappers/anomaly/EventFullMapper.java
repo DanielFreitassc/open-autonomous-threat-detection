@@ -58,6 +58,7 @@ public interface EventFullMapper {
         entity.setMethod(dto.method());
         entity.setEndpoint(dto.endpoint());
         entity.setStatusCode(dto.statusCode());
+        entity.setBodySize(dto.bodySize());
         entity.setProtocol(dto.protocol());
         entity.setEventsEntity(event);
         return entity;

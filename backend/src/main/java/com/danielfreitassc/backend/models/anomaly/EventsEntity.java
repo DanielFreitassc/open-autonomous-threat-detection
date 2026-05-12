@@ -42,4 +42,6 @@ public class EventsEntity {
 
     @OneToMany(mappedBy = "eventsEntity", cascade = CascadeType.ALL, orphanRemoval = true)
     private List<HttpRequestsEntity> httpRequests;
+
+    private boolean falsePositive;
 }

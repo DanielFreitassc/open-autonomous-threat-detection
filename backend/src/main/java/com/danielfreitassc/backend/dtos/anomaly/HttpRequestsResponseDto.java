@@ -4,7 +4,8 @@ public record HttpRequestsResponseDto(
     String id,
     String method,
     String endpoint,
-    int statusCode,
+    String statusCode,
+    String bodySize,
     String protocol
 ) {
     
