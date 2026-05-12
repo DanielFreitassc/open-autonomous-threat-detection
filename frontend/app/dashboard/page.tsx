@@ -1,16 +1,17 @@
 'use client'
 
-import { useState, useMemo } from 'react'
+import { useState, useMemo, useEffect } from 'react'
 import {
   RefreshCw,
   Filter,
   Search,
   AlertTriangle,
-  Shield,
   Activity,
   Cpu,
   Globe,
   Clock,
+  ChevronLeft,
+  ChevronRight
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -26,23 +27,66 @@ import { EventsChart } from '@/components/events-chart'
 import { SeverityChart } from '@/components/severity-chart'
 import { TopSources } from '@/components/top-sources'
 import { EventsTable } from '@/components/events-table'
-import { generateMockAnomalies, calculateStats } from '@/lib/mock-anomalies'
+
+// Importando a nova função de busca paginada da API
+import { getPaginatedEvents } from '@/lib/api'
+import { calculateStats } from '@/lib/mock-anomalies' 
 import type { Anomaly } from '@/types'
 
 export default function DashboardPage() {
-  const [anomalies, setAnomalies] = useState<Anomaly[]>(() => generateMockAnomalies(100))
+  const [anomalies, setAnomalies] = useState<Anomaly[]>([])
+  const [isLoading, setIsLoading] = useState(true)
+  const [isRefreshing, setIsRefreshing] = useState(false)
+  
+  // Filtros
   const [searchTerm, setSearchTerm] = useState('')
   const [typeFilter, setTypeFilter] = useState<string>('ALL')
   const [statusFilter, setStatusFilter] = useState<string>('ALL')
-  const [isRefreshing, setIsRefreshing] = useState(false)
 
+  // Controles de Paginação
+  const [currentPage, setCurrentPage] = useState(0)
+  const [totalPages, setTotalPages] = useState(0)
+  const [totalElements, setTotalElements] = useState(0)
+  const pageSize = 10 // Puxando 10 itens por página conforme o padrão do seu Spring Boot
+
+  // Função centralizada para buscar dados da API
+  const fetchData = async (pageToFetch: number) => {
+    try {
+      const response = await getPaginatedEvents(pageToFetch, pageSize)
+      setAnomalies(response.anomalies)
+      setTotalPages(response.totalPages)
+      setTotalElements(response.totalElements)
+      setCurrentPage(response.currentPage)
+    } catch (error) {
+      console.error('Erro ao buscar incidentes da API:', error)
+    }
+  }
+
+  // Hook disparado ao abrir a tela ou quando a página mudar
+  useEffect(() => {
+    const loadInitialData = async () => {
+      setIsLoading(true)
+      await fetchData(currentPage)
+      setIsLoading(false)
+    }
+    loadInitialData()
+  }, [currentPage])
+
+  // Botão de recarregar
+  const handleRefresh = async () => {
+    setIsRefreshing(true)
+    await fetchData(currentPage)
+    setIsRefreshing(false)
+  }
+
+  // Filtro de busca na tabela
   const filteredAnomalies = useMemo(() => {
     return anomalies.filter((anomaly) => {
       const matchesSearch =
         searchTerm === '' ||
         anomaly.description.toLowerCase().includes(searchTerm.toLowerCase()) ||
         anomaly.id.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        anomaly.source.toLowerCase().includes(searchTerm.toLowerCase())
+        (anomaly.endpoint && anomaly.endpoint.toLowerCase().includes(searchTerm.toLowerCase()))
 
       const matchesType = typeFilter === 'ALL' || anomaly.type === typeFilter
       const matchesStatus = statusFilter === 'ALL' || anomaly.status === statusFilter
@@ -53,55 +97,58 @@ export default function DashboardPage() {
 
   const stats = useMemo(() => calculateStats(anomalies), [anomalies])
 
-  const handleRefresh = () => {
-    setIsRefreshing(true)
-    setTimeout(() => {
-      setAnomalies(generateMockAnomalies(100))
-      setIsRefreshing(false)
-    }, 1000)
-  }
-
   const miniStats = [
     {
       label: 'Total de Eventos',
-      value: stats.total,
-      change: 12,
+      value: totalElements, // Exibe o total real de registros no banco de dados
+      change: 0,
       icon: <Activity className="w-5 h-5 text-primary" />,
       iconBgClass: 'bg-primary/10',
     },
     {
       label: 'Alertas Criticos',
-      value: stats.critical,
-      change: 8,
+      value: stats.critical || 0,
+      change: 0,
       icon: <AlertTriangle className="w-5 h-5 text-red-400" />,
       iconBgClass: 'bg-red-500/10',
     },
     {
       label: 'Em Investigacao',
-      value: stats.investigating,
-      change: -5,
+      value: stats.investigating || 0,
+      change: 0,
       icon: <Search className="w-5 h-5 text-yellow-400" />,
       iconBgClass: 'bg-yellow-500/10',
     },
     {
       label: 'Ativos Monitorados',
-      value: '1,247',
+      value: '1', 
       icon: <Cpu className="w-5 h-5 text-blue-400" />,
       iconBgClass: 'bg-blue-500/10',
     },
     {
       label: 'Origens Ativas',
-      value: '38',
+      value: '1', 
       icon: <Globe className="w-5 h-5 text-green-400" />,
       iconBgClass: 'bg-green-500/10',
     },
     {
       label: 'Ultimo Scan',
-      value: '2min',
+      value: 'Agora', 
       icon: <Clock className="w-5 h-5 text-slate-400" />,
       iconBgClass: 'bg-slate-500/10',
     },
   ]
+
+  if (isLoading) {
+    return (
+      <div className="flex items-center justify-center h-[80vh]">
+        <div className="flex flex-col items-center gap-4">
+          <RefreshCw className="w-8 h-8 text-primary animate-spin" />
+          <p className="text-muted-foreground">Sincronizando com o Banco de Dados...</p>
+        </div>
+      </div>
+    )
+  }
 
   return (
     <div className="space-y-6">
@@ -141,7 +188,7 @@ export default function DashboardPage() {
             <div className="relative flex-1">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
               <Input
-                placeholder="Buscar eventos por ID, descricao ou fonte..."
+                placeholder="Buscar eventos por ID, Rota ou Descricao..."
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
                 className="pl-10 bg-card border-border"
@@ -176,7 +223,34 @@ export default function DashboardPage() {
               </Select>
             </div>
           </div>
-          <EventsTable events={filteredAnomalies} pageSize={10} />
+          
+          <EventsTable events={filteredAnomalies} pageSize={pageSize} />
+
+          {/* Controles de Paginação */}
+          <div className="flex items-center justify-between pt-4">
+            <span className="text-sm text-muted-foreground">
+              Mostrando página {currentPage + 1} de {totalPages || 1} ({totalElements} registros totais)
+            </span>
+            <div className="flex gap-2">
+              <Button
+                variant="outline"
+                size="sm"
+                disabled={currentPage === 0 || isRefreshing}
+                onClick={() => setCurrentPage(prev => prev - 1)}
+              >
+                <ChevronLeft className="w-4 h-4 mr-1" /> Anterior
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                disabled={currentPage >= totalPages - 1 || isRefreshing}
+                onClick={() => setCurrentPage(prev => prev + 1)}
+              >
+                Próxima <ChevronRight className="w-4 h-4 ml-1" />
+              </Button>
+            </div>
+          </div>
+
         </div>
         <div>
           <TopSources events={anomalies} />

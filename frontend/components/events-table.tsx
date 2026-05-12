@@ -1,14 +1,12 @@
 'use client'
 
-import { useState } from 'react'
 import {
   AlertTriangle,
   AlertCircle,
   Info,
-  ChevronLeft,
-  ChevronRight,
   Eye,
   MoreHorizontal,
+  CheckCircle2
 } from 'lucide-react'
 import {
   Table,
@@ -29,9 +27,13 @@ import {
 import type { Anomaly } from '@/types/index'
 import { cn } from '@/lib/utils'
 
+// Importando a função de POST para a whitelist
+import { addWhitelistRule } from '@/lib/api'
+
 interface EventsTableProps {
   events: Anomaly[]
   pageSize?: number
+  onRowClick?: (id: string) => void
 }
 
 const typeConfig = {
@@ -69,13 +71,7 @@ const statusConfig = {
   DISMISSED: { label: 'Descartado', class: 'bg-slate-500/10 text-slate-400 border-slate-500/30' },
 }
 
-export function EventsTable({ events, pageSize = 10 }: EventsTableProps) {
-  const [currentPage, setCurrentPage] = useState(1)
-
-  const totalPages = Math.ceil(events.length / pageSize)
-  const startIndex = (currentPage - 1) * pageSize
-  const paginatedEvents = events.slice(startIndex, startIndex + pageSize)
-
+export function EventsTable({ events, onRowClick }: EventsTableProps) {
   const formatDate = (dateString: string) => {
     const date = new Date(dateString)
     return new Intl.DateTimeFormat('pt-BR', {
@@ -87,137 +83,141 @@ export function EventsTable({ events, pageSize = 10 }: EventsTableProps) {
     }).format(date)
   }
 
+  const getSafeTypeConfig = (type: string) => {
+    return typeConfig[type as keyof typeof typeConfig] || typeConfig['INFO']
+  }
+
+  const getSafeStatusConfig = (status: string) => {
+    return statusConfig[status as keyof typeof statusConfig] || statusConfig['NEW']
+  }
+
+  // Função para adicionar à whitelist (Falso Positivo)
+  const handleMarkFalsePositive = async (event: Anomaly) => {
+    try {
+      const rule = {
+        eventId: event.id, // <-- NOVO CAMPO ADICIONADO AQUI
+        endpoint: event.endpoint || '/',
+        statusCode: event.statusCode ? String(event.statusCode) : '200',
+        bodySize: (event as any).bodySize ? String((event as any).bodySize) : '0' 
+      }
+      
+      await addWhitelistRule(rule)
+      
+      // Feedback rápido na tela
+      alert(`✅ Rota ${rule.endpoint} (Status ${rule.statusCode}) adicionada à Whitelist com sucesso! O Agente IA passará a ignorá-la.`)
+    } catch (error) {
+      console.error('Erro ao adicionar à whitelist:', error)
+      alert('❌ Ocorreu um erro ao tentar marcar como falso positivo.')
+    }
+  }
+
   return (
     <div className="space-y-4">
       <div className="rounded-lg border border-border bg-card overflow-hidden">
         <Table>
           <TableHeader>
             <TableRow className="border-border hover:bg-transparent">
-              <TableHead className="w-[100px] text-muted-foreground">Severidade</TableHead>
-              <TableHead className="w-[140px] text-muted-foreground">ID</TableHead>
-              <TableHead className="text-muted-foreground">Descricao</TableHead>
-              <TableHead className="w-[150px] text-muted-foreground">Fonte</TableHead>
+              <TableHead className="w-[110px] text-muted-foreground">Severidade</TableHead>
               <TableHead className="w-[140px] text-muted-foreground">Timestamp</TableHead>
-              <TableHead className="w-[110px] text-muted-foreground">Status</TableHead>
-              <TableHead className="w-[80px] text-muted-foreground text-right">Conf.</TableHead>
+              <TableHead className="text-muted-foreground">Descrição</TableHead>
+              <TableHead className="text-muted-foreground">Rota</TableHead>
+              <TableHead className="w-[90px] text-muted-foreground text-center">Status HTTP</TableHead>
+              <TableHead className="w-[130px] text-muted-foreground">Fonte</TableHead>
+              <TableHead className="w-[100px] text-muted-foreground">Status</TableHead>
               <TableHead className="w-[50px]"></TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
-            {paginatedEvents.map((event) => {
-              const config = typeConfig[event.type]
-              const status = statusConfig[event.status]
-              const Icon = config.icon
-              return (
-                <TableRow
-                  key={event.id}
-                  className="border-border hover:bg-muted/50 cursor-pointer transition-colors"
-                >
-                  <TableCell>
-                    <div className="flex items-center gap-2">
-                      <Icon className={cn('w-4 h-4', config.color)} />
-                      <Badge variant="outline" className={cn('text-xs font-medium', config.bgClass)}>
-                        {event.type}
+            {events.length === 0 ? (
+              <TableRow>
+                <TableCell colSpan={8} className="h-24 text-center text-muted-foreground">
+                  Nenhum evento encontrado.
+                </TableCell>
+              </TableRow>
+            ) : (
+              events.map((event) => {
+                const config = getSafeTypeConfig(event.type)
+                const status = getSafeStatusConfig(event.status)
+                const Icon = config.icon
+
+                return (
+                  <TableRow
+                    key={event.id}
+                    onClick={() => onRowClick && onRowClick(event.id)}
+                    className={cn("border-border transition-colors", onRowClick ? "cursor-pointer hover:bg-muted/50" : "")}
+                  >
+                    <TableCell>
+                      <div className="flex items-center gap-2">
+                        <Icon className={cn('w-4 h-4', config.color)} />
+                        <Badge variant="outline" className={cn('text-[10px] font-medium', config.bgClass)}>
+                          {event.type}
+                        </Badge>
+                      </div>
+                    </TableCell>
+                    <TableCell className="text-xs text-muted-foreground font-mono whitespace-nowrap">
+                      {formatDate(event.timestamp)}
+                    </TableCell>
+                    <TableCell className="max-w-[250px]">
+                      <span className="text-sm text-foreground truncate block" title={event.description}>
+                        {event.description}
+                      </span>
+                    </TableCell>
+                    <TableCell className="font-mono text-xs text-muted-foreground truncate max-w-[150px]" title={event.endpoint}>
+                      {event.endpoint || 'N/A'}
+                    </TableCell>
+                    <TableCell className="text-center">
+                      {event.statusCode ? (
+                        <span className={cn(
+                          "px-2 py-1 rounded text-xs font-mono font-medium",
+                          event.statusCode.startsWith('4') || event.statusCode.startsWith('5') 
+                            ? "bg-red-500/10 text-red-400" 
+                            : "bg-green-500/10 text-green-400"
+                        )}>
+                          {event.statusCode}
+                        </span>
+                      ) : (
+                        <span className="text-muted-foreground">-</span>
+                      )}
+                    </TableCell>
+                    <TableCell className="text-xs text-muted-foreground">
+                      {event.source}
+                    </TableCell>
+                    <TableCell>
+                      <Badge variant="outline" className={cn('text-[10px]', status.class)}>
+                        {status.label}
                       </Badge>
-                    </div>
-                  </TableCell>
-                  <TableCell className="font-mono text-xs text-muted-foreground">
-                    {event.id}
-                  </TableCell>
-                  <TableCell className="max-w-[300px]">
-                    <span className="text-sm text-foreground truncate block">
-                      {event.description}
-                    </span>
-                  </TableCell>
-                  <TableCell className="text-sm text-muted-foreground">
-                    {event.source}
-                  </TableCell>
-                  <TableCell className="text-xs text-muted-foreground font-mono">
-                    {formatDate(event.timestamp)}
-                  </TableCell>
-                  <TableCell>
-                    <Badge variant="outline" className={cn('text-xs', status.class)}>
-                      {status.label}
-                    </Badge>
-                  </TableCell>
-                  <TableCell className="text-right">
-                    <span className="text-sm font-medium text-foreground">{event.confidence}%</span>
-                  </TableCell>
-                  <TableCell>
-                    <DropdownMenu>
-                      <DropdownMenuTrigger asChild>
-                        <Button variant="ghost" size="icon" className="h-8 w-8">
-                          <MoreHorizontal className="w-4 h-4" />
-                        </Button>
-                      </DropdownMenuTrigger>
-                      <DropdownMenuContent align="end">
-                        <DropdownMenuItem>
-                          <Eye className="w-4 h-4 mr-2" />
-                          Ver detalhes
-                        </DropdownMenuItem>
-                        <DropdownMenuItem>Investigar</DropdownMenuItem>
-                        <DropdownMenuItem>Marcar como resolvido</DropdownMenuItem>
-                        <DropdownMenuItem>Descartar</DropdownMenuItem>
-                      </DropdownMenuContent>
-                    </DropdownMenu>
-                  </TableCell>
-                </TableRow>
-              )
-            })}
+                    </TableCell>
+                    <TableCell onClick={(e) => e.stopPropagation()}>
+                      <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                          <Button variant="ghost" size="icon" className="h-8 w-8">
+                            <MoreHorizontal className="w-4 h-4" />
+                          </Button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent align="end">
+                          <DropdownMenuItem onClick={() => onRowClick && onRowClick(event.id)}>
+                            <Eye className="w-4 h-4 mr-2" />
+                            Ver detalhes
+                          </DropdownMenuItem>
+                          
+                          {/* Botão de Falso Positivo (Whitelist) */}
+                          <DropdownMenuItem 
+                            onClick={() => handleMarkFalsePositive(event)}
+                            className="text-green-500 focus:text-green-500"
+                          >
+                            <CheckCircle2 className="w-4 h-4 mr-2" />
+                            Descartar (Falso Positivo)
+                          </DropdownMenuItem>
+
+                        </DropdownMenuContent>
+                      </DropdownMenu>
+                    </TableCell>
+                  </TableRow>
+                )
+              })
+            )}
           </TableBody>
         </Table>
-      </div>
-
-      <div className="flex items-center justify-between px-2">
-        <p className="text-sm text-muted-foreground">
-          Mostrando {startIndex + 1} a {Math.min(startIndex + pageSize, events.length)} de{' '}
-          {events.length} eventos
-        </p>
-        <div className="flex items-center gap-2">
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
-            disabled={currentPage === 1}
-          >
-            <ChevronLeft className="w-4 h-4 mr-1" />
-            Anterior
-          </Button>
-          <div className="flex items-center gap-1">
-            {Array.from({ length: Math.min(5, totalPages) }, (_, i) => {
-              let pageNum: number
-              if (totalPages <= 5) {
-                pageNum = i + 1
-              } else if (currentPage <= 3) {
-                pageNum = i + 1
-              } else if (currentPage >= totalPages - 2) {
-                pageNum = totalPages - 4 + i
-              } else {
-                pageNum = currentPage - 2 + i
-              }
-              return (
-                <Button
-                  key={pageNum}
-                  variant={currentPage === pageNum ? 'default' : 'outline'}
-                  size="sm"
-                  className="w-8 h-8 p-0"
-                  onClick={() => setCurrentPage(pageNum)}
-                >
-                  {pageNum}
-                </Button>
-              )
-            })}
-          </div>
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
-            disabled={currentPage === totalPages}
-          >
-            Proximo
-            <ChevronRight className="w-4 h-4 ml-1" />
-          </Button>
-        </div>
       </div>
     </div>
   )

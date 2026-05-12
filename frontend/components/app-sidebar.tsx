@@ -15,22 +15,20 @@ import {
   Globe,
   Cpu,
   LogOut,
+  ShieldCheck // <-- Importando o novo ícone
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { useAuth } from '@/contexts/auth-context'
 
 const navigation = [
   { name: 'Visao Geral', href: '/dashboard', icon: Activity },
-  { name: 'Alertas', href: '/dashboard/alerts', icon: AlertTriangle },
   { name: 'Eventos', href: '/dashboard/events', icon: FileText },
-  { name: 'Rede', href: '/dashboard/network', icon: Network },
-  { name: 'Endpoints', href: '/dashboard/endpoints', icon: Cpu },
   { name: 'Ativos', href: '/dashboard/assets', icon: Database },
-  { name: 'Geo Map', href: '/dashboard/geo', icon: Globe },
-  { name: 'Relatorios', href: '/dashboard/reports', icon: BarChart3 },
 ]
 
+// Adicionando a Whitelist na seção de gerenciamento
 const management = [
+  { name: 'Whitelist', href: '/dashboard/whitelist', icon: ShieldCheck }, // <-- NOVO ITEM
   { name: 'Usuarios', href: '/dashboard/users', icon: Users },
   { name: 'Configuracoes', href: '/dashboard/settings', icon: Settings },
 ]
@@ -58,7 +56,7 @@ export function AppSidebar() {
           </span>
         </div>
         {navigation.map((item) => {
-          const isActive = pathname === item.href
+          const isActive = pathname.startsWith(item.href) && item.href !== '/dashboard' || (item.href === '/dashboard' && pathname === '/dashboard')
           return (
             <Link
               key={item.name}
@@ -82,7 +80,7 @@ export function AppSidebar() {
           </span>
         </div>
         {management.map((item) => {
-          const isActive = pathname === item.href
+          const isActive = pathname.startsWith(item.href)
           return (
             <Link
               key={item.name}
