@@ -3,73 +3,71 @@ import pandas as pd
 import re
 import os
 import joblib
-import time
 import requests
-import math
+import psycopg2
 from datetime import datetime
 from collections import Counter
 from sklearn.ensemble import IsolationForest
+from dotenv import load_dotenv
+
+# Carrega as variáveis do arquivo .env
+load_dotenv()
 
 # --- CONFIGURAÇÕES ---
-IP_LISTEN = "0.0.0.0"
-PORT_LISTEN = 5140
+IP_LISTEN = os.getenv("IP_LISTEN", "0.0.0.0")
+PORT_LISTEN = int(os.getenv("PORT_LISTEN", 5140))
 BUFFER_SIZE = 2048
 ARQUIVO_MODELO = "modelo_ia.pkl"
-ARQUIVO_TREINO = "dataset_treino.csv"
 ARQUIVO_FREQUENCIAS = "frequencia_rotas.pkl"
-WHITELIST_FILE = "whitelist_features.csv"
-LIMITE_LOGS_TREINO = 1000  
+LIMITE_LOGS_TREINO = 9000 
 
-# REST API do CSIRT
-API_ENDPOINT = "http://localhost:8080/api/v1/events"
+# API E BANCO
+API_ENDPOINT = os.getenv("API_ENDPOINT", "http://localhost:8080/api/v1/events")
 BEARER_TOKEN = os.getenv("CSIRT_API_TOKEN", "")
+
+# Configuração do DB
+DB_CONFIG = {
+    "host": os.getenv("DB_HOST", "localhost"),
+    "port": os.getenv("DB_PORT", "5432"),
+    "database": os.getenv("DB_NAME", "db"),
+    "user": os.getenv("DB_USER", "admin"),
+    "password": os.getenv("DB_PASSWORD", "admin")
+}
 
 MIN_PORCENTAGEM_ROTA = 0.05 
 
 # --- FUNÇÕES DE APOIO ---
 
-def obter_geolocalizacao(ip):
-    """Consulta o IP e retorna Localização, Lat e Lon (com fallback para local)."""
-    # Se o IP for local ou de rede interna do Docker (172.x)
-    if ip in ["127.0.0.1", "0.0.0.0"] or ip.startswith(("192.168.", "172.", "10.")):
-        # Retorna as coordenadas manuais solicitadas
-        return "Brasil (Local)", -28.6775, -49.3697
-    
+def verificar_whitelist_banco(endpoint, status, tamanho):
+    """Verifica se a combinação existe na whitelist do banco."""
     try:
-        response = requests.get(f"http://ip-api.com/json/{ip}", timeout=2)
-        if response.status_code == 200:
-            d = response.json()
-            if d.get("status") == "success":
-                loc = f"{d.get('city', 'Desconhecida')}, {d.get('country', 'Desconhecido')}"
-                return loc, float(d.get('lat', 0.0)), float(d.get('lon', 0.0))
+        conn = psycopg2.connect(**DB_CONFIG)
+        cur = conn.cursor()
+        query = """
+            SELECT EXISTS(
+                SELECT 1 FROM whitelist 
+                WHERE endpoint = %s AND status_code = %s AND body_size = %s
+            )
+        """
+        cur.execute(query, (endpoint, str(status), str(tamanho)))
+        existe = cur.fetchone()[0]
+        cur.close()
+        conn.close()
+        return existe
     except Exception as e:
-        print(f"⚠️ Erro ao buscar GeoIP: {e}")
-    
-    # Fallback caso a API falhe mas seja um IP externo
-    return "Desconhecido", 0.0, 0.0
+        print(f"⚠️ Erro ao consultar banco: {e}")
+        return False
 
 def extrair_dados_log(log_msg):
-    """Extrai Rota, Status Code, Tamanho e metadados do Syslog/Nginx."""
     dados_extras = {
-        "host": "unknown",
-        "service": "unknown",
-        "ip": "0.0.0.0",
-        "method": "UNKNOWN",
-        "protocol": "HTTP/1.1",
-        "user_agent": "Unknown"
+        "host": "unknown", "service": "unknown", "ip": "0.0.0.0", 
+        "method": "UNKNOWN", "protocol": "HTTP/1.1", "user_agent": "Unknown"
     }
     
-    # Extração de cabeçalho Syslog (Host, Serviço e IP)
     syslog_match = re.search(r'<\d+>[A-Za-z]+\s+\d+\s+\d{2}:\d{2}:\d{2}\s+([^\s]+)\s+([^:]+):\s+([\d\.]+)', log_msg)
     if syslog_match:
-        dados_extras["host"] = syslog_match.group(1)
-        dados_extras["service"] = syslog_match.group(2)
-        dados_extras["ip"] = syslog_match.group(3)
-    else:
-        match_ip = re.search(r'(\d+\.\d+\.\d+\.\d+)', log_msg)
-        if match_ip: dados_extras["ip"] = match_ip.group(1)
+        dados_extras["host"], dados_extras["service"], dados_extras["ip"] = syslog_match.groups()
 
-    # Extração da requisição HTTP
     req_match = re.search(r'\"([A-Z]+) (.*?) (HTTP/\d\.\d)\" (\d{3}) (\d+)', log_msg)
     if req_match:
         dados_extras["method"] = req_match.group(1)
@@ -81,26 +79,30 @@ def extrair_dados_log(log_msg):
         if ua_match: dados_extras["user_agent"] = ua_match.group(1)
             
         return rota, [status, tamanho], dados_extras
-        
     return None, None, None
 
-def enviar_alerta_rest(log_line, rota, features, motivo_anomalia, dados_extras):
-    """Monta o payload JSON e envia para o backend centralizado."""
-    timestamp_agora = datetime.now().isoformat()
-    localizacao, lat, lon = obter_geolocalizacao(dados_extras["ip"])
-
+def enviar_alerta_rest(log_line, rota, features_ia, motivo, dados_extras):
+    """Monta o payload JSON atualizado e envia para o backend centralizado."""
+    timestamp = datetime.now().isoformat()
+    
     payload = {
         "events": {
-            "timestamp": timestamp_agora,
-            "category": "web_attack", 
-            "type": "comportamento_suspeito", 
-            "outcome": "detected" 
+            "timestamp": timestamp,
+            "category": "web_attack",
+            "type": "comportamento_suspeito", # Ajustável conforme a detecção
+            "outcome": "detected"
+        },
+        "features": {
+            "requestRate": 0.0, # Placeholder para expansão futura
+            "failedLoginCount": 0,
+            "geoDistanceKm": 0.0
         },
         "httpRequests": [
             {
                 "method": dados_extras["method"],
                 "endpoint": rota,
-                "statusCode": features[0],
+                "statusCode": str(features_ia[0]), # StatusCode como String
+                "bodySize": str(features_ia[1]),   # Novo campo bodySize como String
                 "protocol": dados_extras["protocol"]
             }
         ],
@@ -108,26 +110,23 @@ def enviar_alerta_rest(log_line, rota, features, motivo_anomalia, dados_extras):
             "raw": log_line.strip()
         },
         "sourcers": {
-            "service": dados_extras["service"], 
-            "engine": "IA-CSIRT-Central",
-            "host": dados_extras["host"],
+            "service": dados_extras["service"],
+            "engine": "IA-CSIRT-Central", 
+            "host": dados_extras["host"], 
             "clientIp": dados_extras["ip"],
-            "userAgent": dados_extras["user_agent"],
-            "location": localizacao,
-            "latitude": lat,
-            "longitude": lon
+            "userAgent": dados_extras["user_agent"]
         },
         "anomaly": {
             "rule": "Regra IA - Desvio de Padrão",
             "severity": "HIGH",
-            "title": motivo_anomalia,
-            "description": f"A rota {rota} disparou um alerta detectado por Isolation Forest.",
-            "timestamp": timestamp_agora
+            "title": motivo,
+            "description": f"A rota {rota} disparou um alerta. Modelo de ML classificou como anomalia.",
+            "timestamp": timestamp
         }
     }
 
     headers = {"Authorization": f"Bearer {BEARER_TOKEN}", "Content-Type": "application/json"}
-
+    
     try:
         response = requests.post(API_ENDPOINT, json=payload, headers=headers, timeout=5)
         if response.status_code in [200, 201, 202]:
@@ -137,30 +136,18 @@ def enviar_alerta_rest(log_line, rota, features, motivo_anomalia, dados_extras):
     except Exception as e:
         print(f"❌ Falha de conexão: {e}")
 
-def carregar_whitelist():
-    if os.path.exists(WHITELIST_FILE):
-        return pd.read_csv(WHITELIST_FILE).values.tolist()
-    return []
-
-def salvar_na_whitelist(features):
-    novo_dado = pd.DataFrame([features], columns=['status', 'tamanho'])
-    novo_dado.to_csv(WHITELIST_FILE, mode='a', index=False, header=not os.path.exists(WHITELIST_FILE))
-
 # --- INICIALIZAÇÃO ---
 
-if os.path.exists(ARQUIVO_MODELO) and os.path.exists(ARQUIVO_FREQUENCIAS):
+if os.path.exists(ARQUIVO_MODELO):
     model = joblib.load(ARQUIVO_MODELO)
     frequencia_rotas = joblib.load(ARQUIVO_FREQUENCIAS)
     fase_treino_ativa = False
-    print("🧠 Modelo carregado e monitorando.")
 else:
     model = IsolationForest(contamination=0.05, random_state=42)
-    frequencia_rotas = {}
     fase_treino_ativa = True
 
 sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
 sock.bind((IP_LISTEN, PORT_LISTEN))
-whitelist = carregar_whitelist()
 coletados_treino, rotas_treino = [], []
 
 print(f"🚀 Agente IA ativo em {IP_LISTEN}:{PORT_LISTEN}")
@@ -171,12 +158,12 @@ try:
     while True:
         data, addr = sock.recvfrom(BUFFER_SIZE)
         log_line = data.decode('utf-8', errors='ignore')
-        rota, features, dados_extras = extrair_dados_log(log_line)
+        rota, features_ia, dados_extras = extrair_dados_log(log_line)
 
-        if not features: continue
+        if not features_ia: continue
 
         if fase_treino_ativa:
-            coletados_treino.append(features)
+            coletados_treino.append(features_ia)
             rotas_treino.append(rota)
             print(f"📖 Aprendendo: {len(coletados_treino)}/{LIMITE_LOGS_TREINO}", end='\r')
             if len(coletados_treino) >= LIMITE_LOGS_TREINO:
@@ -190,26 +177,24 @@ try:
                 print("\n✅ Treino concluído!")
             continue
 
-        is_anomalia, motivo = False, ""
-        if frequencia_rotas.get(rota, 0.0) < MIN_PORCENTAGEM_ROTA:
-            is_anomalia, motivo = True, f"ROTA INCOMUM ({frequencia_rotas.get(rota, 0.0)*100:.2f}%)"
-        elif features not in whitelist:
-            df_features = pd.DataFrame([features], columns=['status', 'tamanho'])
-            if model.predict(df_features)[0] == -1:
-                is_anomalia, motivo = True, "COMPORTAMENTO ANÔMALO (IA)"
+        # 1. VERIFICAÇÃO DE WHITELIST NO BANCO
+        if verificar_whitelist_banco(rota, features_ia[0], features_ia[1]):
+            print(f"✅ Ignorado (Whitelist): {rota}")
+            continue
 
-        if is_anomalia:
-            print(f"\n⚠️ ANOMALIA: {log_line.strip()}")
-            enviar_alerta_rest(log_line, rota, features, motivo, dados_extras)
-            feedback = input("❓ Falso positivo? (s/n): ").lower()
-            if feedback == 's':
-                salvar_na_whitelist(features)
-                whitelist.append(features)
-                print("✔️ Whitelisted.")
-            else:
-                print("🚨 Incidente confirmado.")
+        # 2. DETECÇÃO
+        is_anomalia = False
+        if frequencia_rotas.get(rota, 0.0) < MIN_PORCENTAGEM_ROTA:
+            is_anomalia, motivo = True, f"ROTA INCOMUM (Acessada {frequencia_rotas.get(rota, 0.0)*100:.2f}% das vezes)"
         else:
-            print(f"✅ NORMAL: {rota} -> {features}")
+            df_feat = pd.DataFrame([features_ia], columns=['status', 'tamanho'])
+            if model.predict(df_feat)[0] == -1:
+                is_anomalia, motivo = True, "COMPORTAMENTO ANÔMALO (Isolation Forest)"
+
+        # 3. ENVIO DO ALERTA FORMATADO
+        if is_anomalia:
+            print(f"⚠️ ANOMALIA DETECTADA: {rota}")
+            enviar_alerta_rest(log_line, rota, features_ia, motivo, dados_extras)
 
 except KeyboardInterrupt:
     print("\n🛑 Encerrado.")
