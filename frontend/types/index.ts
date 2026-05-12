@@ -1,3 +1,5 @@
+// types/index.ts (ou types.ts)
+
 export interface User {
   id: string
   name: string
@@ -36,6 +38,7 @@ export interface PaginatedResponse<T> {
   totalPages: number
 }
 
+// === INTERFACE ATUALIZADA ===
 export interface Anomaly {
   id: string
   type: 'CRITICAL' | 'HIGH' | 'MEDIUM' | 'LOW' | 'INFO'
@@ -46,6 +49,14 @@ export interface Anomaly {
   confidence: number
   affectedAssets: string[]
   mlModel: string
+  
+  // Nossas propriedades adicionadas para a tabela e sidebar
+  endpoint?: string
+  clientIp?: string
+  statusCode?: string
+  rawLog?: string
+  userAgent?: string
+  bodySize?: string
   rawData?: Record<string, unknown>
 }
 

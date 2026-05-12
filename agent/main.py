@@ -23,7 +23,7 @@ LIMITE_LOGS_TREINO = 9000
 
 # API E BANCO
 API_ENDPOINT = os.getenv("API_ENDPOINT", "http://localhost:8080/api/v1/events")
-BEARER_TOKEN = os.getenv("CSIRT_API_TOKEN", "")
+BEARER_TOKEN = os.getenv("API_TOKEN", "")
 
 # Configuração do DB
 DB_CONFIG = {
@@ -111,7 +111,7 @@ def enviar_alerta_rest(log_line, rota, features_ia, motivo, dados_extras):
         },
         "sourcers": {
             "service": dados_extras["service"],
-            "engine": "IA-CSIRT-Central", 
+            "engine": "IA-Central", 
             "host": dados_extras["host"], 
             "clientIp": dados_extras["ip"],
             "userAgent": dados_extras["user_agent"]

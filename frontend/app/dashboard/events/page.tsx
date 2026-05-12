@@ -22,7 +22,7 @@ import {
 } from '@/components/ui/select'
 import { EventsTable } from '@/components/events-table'
 import { getPaginatedEvents } from '@/lib/api'
-import type { Anomaly } from '@/types'
+import type { Anomaly } from '@/types/index'
 import { EventDetailsSidebar } from '@/components/event-details-sidebar'
 
 export default function EventsPage() {

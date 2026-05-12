@@ -41,7 +41,7 @@ import {
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
-import type { User, PaginatedResponse } from '@/types'
+import type { User, PaginatedResponse } from '@/types/index'
 
 export default function UsersPage() {
   const [activeUsers, setActiveUsers] = useState<User[]>([])

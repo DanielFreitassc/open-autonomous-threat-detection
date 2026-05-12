@@ -3,7 +3,7 @@
 import { useMemo } from 'react'
 import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip, Legend } from 'recharts'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
-import type { AnomalyStats } from '@/types'
+import type { AnomalyStats } from '@/types/index'
 
 interface SeverityChartProps {
   stats: AnomalyStats

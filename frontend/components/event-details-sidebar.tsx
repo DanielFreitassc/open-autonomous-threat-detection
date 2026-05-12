@@ -4,7 +4,7 @@ import { useEffect, useState } from 'react'
 import { X, Server, Activity, ShieldAlert, Clock, Code, RefreshCw } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { getEventById, addWhitelistRule } from '@/lib/api'
-import type { Anomaly } from '@/types'
+import type { Anomaly } from '@/types/index'
 
 interface EventDetailsSidebarProps {
   eventId: string | null

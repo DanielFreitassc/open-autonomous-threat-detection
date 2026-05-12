@@ -3,7 +3,7 @@ spring:
     name: backend
   datasource:
     #url: jdbc:h2:mem:/db
-    url: jdbc:postgresql://localhost:5432/db
+    url: jdbc:postgresql://open_autonomous_db:5432/db
     username: ${DB_USER:admin}
     password: ${DB_PASS:admin}
     

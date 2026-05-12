@@ -31,7 +31,7 @@ import { EventsTable } from '@/components/events-table'
 // Importando a nova função de busca paginada da API
 import { getPaginatedEvents } from '@/lib/api'
 import { calculateStats } from '@/lib/mock-anomalies' 
-import type { Anomaly } from '@/types'
+import type { Anomaly } from '@/types/index'
 
 export default function DashboardPage() {
   const [anomalies, setAnomalies] = useState<Anomaly[]>([])
