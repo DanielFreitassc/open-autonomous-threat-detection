@@ -27,7 +27,11 @@ api.interceptors.response.use(
   (response) => response,
   (error) => {
     if (error.response?.status === 401) {
-      if (typeof window !== 'undefined') {
+      const requestUrl = error.config?.url || '';
+      const isModuleLogin = requestUrl.includes('/auth/login-modules');
+      const isNormalLogin = requestUrl.includes('/users/login') || requestUrl.includes('/login'); 
+
+      if (!isModuleLogin && !isNormalLogin && typeof window !== 'undefined') {
         localStorage.removeItem('token')
         window.location.href = '/login'
       }
@@ -39,7 +43,6 @@ api.interceptors.response.use(
 // ==========================================
 // INTEGRAÇÃO COM O SPRING BOOT - EVENTOS
 // ==========================================
-
 export interface SpringEvent {
   events: { id: string; timestamp: string; category: string; type: string; outcome: string }
   httpRequests: Array<{ id?: string; method: string; endpoint: string; statusCode: string; bodySize: string; protocol: string }>
@@ -79,7 +82,6 @@ function mapSpringEventToAnomaly(item: SpringEvent): Anomaly {
 export async function getPaginatedEvents(page = 0, size = 10) {
   const { data } = await api.get<SpringPageResponse>(`/events?page=${page}&size=${size}`)
   const anomalies: Anomaly[] = data.content.map(mapSpringEventToAnomaly)
-
   return {
     anomalies,
     totalElements: data.totalElements,
@@ -96,7 +98,6 @@ export async function getEventById(id: string) {
 // ==========================================
 // INTEGRAÇÃO COM O SPRING BOOT - WHITELIST
 // ==========================================
-
 export interface WhitelistRule {
   id: string
   endpoint: string
@@ -119,10 +120,8 @@ interface SpringWhitelistPageResponse {
   size: number
 }
 
-// 1. GET Paginado
 export async function getPaginatedWhitelist(page = 0, size = 20) {
   const { data } = await api.get<SpringWhitelistPageResponse>(`/whitelist?page=${page}&size=${size}`)
-  
   return {
     rules: data.content,
     totalElements: data.totalElements,
@@ -131,15 +130,72 @@ export async function getPaginatedWhitelist(page = 0, size = 20) {
   }
 }
 
-// 2. POST - Criar nova regra
 export async function addWhitelistRule(rule: WhitelistRequest) {
   const { data } = await api.post<WhitelistRule>('/whitelist', rule)
   return data
 }
 
-// 3. DELETE - Remover regra pelo ID
 export async function deleteWhitelistRule(id: string) {
   await api.delete(`/whitelist/${id}`)
 }
 
-export default api
+// ==========================================
+// INTEGRAÇÃO COM O SPRING BOOT - MÓDULOS (SERVICE ACCOUNTS)
+// ==========================================
+
+export interface ModuleResponse {
+  id: string
+  name: string
+  username: string
+  active: boolean
+  createdAt: string
+}
+
+interface SpringModulePageResponse {
+  content: ModuleResponse[]
+  totalElements: number
+  totalPages: number
+  number: number
+  size: number
+}
+
+export interface ModuleRequest {
+  name?: string
+  username: string
+  password?: string
+}
+
+export interface LoginModuleResponse {
+  token: string 
+}
+
+// 1. GET Paginado - Listar Módulos
+export async function getPaginatedModules(page = 0, size = 20) {
+  const { data } = await api.get<SpringModulePageResponse>(`/modules?page=${page}&size=${size}`)
+  return data
+}
+
+// 2. Criar Módulo
+export async function createModuleAccount(payload: ModuleRequest) {
+  const { data } = await api.post('/modules', payload)
+  return data
+}
+
+// 3. Editar/Atualizar Módulo (Ajustado para Partial para permitir envio parcial de campos)
+export async function updateModuleAccount(id: string, payload: Partial<ModuleRequest>) {
+  const { data } = await api.patch(`/modules/${id}`, payload)
+  return data
+}
+
+// 4. Deletar Módulo
+export async function deleteModuleAccount(id: string) {
+  await api.delete(`/modules/${id}`)
+}
+
+// 5. Login do Módulo (Gera o JWT)
+export async function loginModule(payload: Omit<ModuleRequest, 'name'>) {
+  const { data } = await api.post<LoginModuleResponse>('/auth/login-modules', payload)
+  return data
+}
+
+export default api 

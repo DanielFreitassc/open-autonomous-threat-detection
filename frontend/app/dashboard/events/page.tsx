@@ -220,9 +220,11 @@ export default function EventsPage() {
                 events={filteredAnomalies} 
                 pageSize={pageSize} 
                 onRowClick={(id) => setSelectedEventId(id)} 
+                onRefresh={handleManualRefresh}
               />
             </div>
-
+            
+            
             {/* Rodapé com Paginação da API */}
             <div className="flex items-center justify-between p-4 border-t border-border bg-muted/20">
               <span className="text-sm text-muted-foreground">

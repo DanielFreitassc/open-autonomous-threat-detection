@@ -7,25 +7,24 @@ RUN groupadd -r agentgroup && useradd -r -g agentgroup -d /app -s /sbin/nologin 
 # Define o diretório de trabalho
 WORKDIR /app
 
-# Instala as dependências do Python diretamente
-# Usamos psycopg2-binary para evitar a necessidade de instalar o GCC e compilar código C
-RUN pip install --no-cache-dir --upgrade pip && \
-    pip install --no-cache-dir \
-    pandas \
-    scikit-learn \
-    joblib \
-    requests \
-    psycopg2-binary \
-    python-dotenv
+# Copia PRIMEIRO o requirements.txt para aproveitar o cache de camadas do Docker
+COPY --chown=agentuser:agentgroup requirements.txt .
 
-# Copia os arquivos já atribuindo a propriedade ao usuário restrito
+# Instala as dependências a partir do arquivo
+RUN pip install --no-cache-dir --upgrade pip && \
+    pip install --no-cache-dir -r requirements.txt
+
+# Copia o restante dos arquivos já atribuindo a propriedade ao usuário restrito
 COPY --chown=agentuser:agentgroup . .
 
 # Muda para o usuário sem privilégios de root ANTES de iniciar a aplicação
 USER agentuser
 
-# Expõe a porta que o script está escutando (UDP)
+# Expõe as portas que o agente utiliza
+# 5140 UDP: Recebimento de logs (Syslog)
+# 5000 TCP: API REST interna do Flask para gerenciar o Token
 EXPOSE 5140/udp
+EXPOSE 5000
 
 # O -u garante que os logs do Python saiam em tempo real no terminal do Docker
 CMD ["python", "-u", "main.py"]

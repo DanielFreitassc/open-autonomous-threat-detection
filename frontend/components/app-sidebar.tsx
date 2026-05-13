@@ -13,9 +13,9 @@ import {
   Users,
   BarChart3,
   Globe,
-  Cpu,
+  Cpu, // <-- Sendo usado agora para os Agentes
   LogOut,
-  ShieldCheck // <-- Importando o novo ícone
+  ShieldCheck
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { useAuth } from '@/contexts/auth-context'
@@ -23,12 +23,12 @@ import { useAuth } from '@/contexts/auth-context'
 const navigation = [
   { name: 'Visao Geral', href: '/dashboard', icon: Activity },
   { name: 'Eventos', href: '/dashboard/events', icon: FileText },
-  { name: 'Ativos', href: '/dashboard/assets', icon: Database },
 ]
 
-// Adicionando a Whitelist na seção de gerenciamento
+// Adicionando a aba de Agentes na seção de gerenciamento
 const management = [
-  { name: 'Whitelist', href: '/dashboard/whitelist', icon: ShieldCheck }, // <-- NOVO ITEM
+  { name: 'Whitelist', href: '/dashboard/whitelist', icon: ShieldCheck },
+  { name: 'Agentes', href: '/dashboard/agents', icon: Cpu }, // <-- NOVO ITEM
   { name: 'Usuarios', href: '/dashboard/users', icon: Users },
   { name: 'Configuracoes', href: '/dashboard/settings', icon: Settings },
 ]

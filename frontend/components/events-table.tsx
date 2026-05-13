@@ -27,41 +27,21 @@ import {
 import type { Anomaly } from '@/types/index'
 import { cn } from '@/lib/utils'
 
-// Importando a função de POST para a whitelist
 import { addWhitelistRule } from '@/lib/api'
 
 interface EventsTableProps {
   events: Anomaly[]
   pageSize?: number
   onRowClick?: (id: string) => void
+  onRefresh?: () => void // <-- NOVO: Propriedade para avisar o pai que precisa recarregar
 }
 
 const typeConfig = {
-  CRITICAL: {
-    icon: AlertTriangle,
-    color: 'text-red-400',
-    bgClass: 'bg-red-500/10 text-red-400 border-red-500/30',
-  },
-  HIGH: {
-    icon: AlertTriangle,
-    color: 'text-orange-400',
-    bgClass: 'bg-orange-500/10 text-orange-400 border-orange-500/30',
-  },
-  MEDIUM: {
-    icon: AlertCircle,
-    color: 'text-yellow-400',
-    bgClass: 'bg-yellow-500/10 text-yellow-400 border-yellow-500/30',
-  },
-  LOW: {
-    icon: Info,
-    color: 'text-blue-400',
-    bgClass: 'bg-blue-500/10 text-blue-400 border-blue-500/30',
-  },
-  INFO: {
-    icon: Info,
-    color: 'text-slate-400',
-    bgClass: 'bg-slate-500/10 text-slate-400 border-slate-500/30',
-  },
+  CRITICAL: { icon: AlertTriangle, color: 'text-red-400', bgClass: 'bg-red-500/10 text-red-400 border-red-500/30' },
+  HIGH: { icon: AlertTriangle, color: 'text-orange-400', bgClass: 'bg-orange-500/10 text-orange-400 border-orange-500/30' },
+  MEDIUM: { icon: AlertCircle, color: 'text-yellow-400', bgClass: 'bg-yellow-500/10 text-yellow-400 border-yellow-500/30' },
+  LOW: { icon: Info, color: 'text-blue-400', bgClass: 'bg-blue-500/10 text-blue-400 border-blue-500/30' },
+  INFO: { icon: Info, color: 'text-slate-400', bgClass: 'bg-slate-500/10 text-slate-400 border-slate-500/30' },
 }
 
 const statusConfig = {
@@ -71,31 +51,21 @@ const statusConfig = {
   DISMISSED: { label: 'Descartado', class: 'bg-slate-500/10 text-slate-400 border-slate-500/30' },
 }
 
-export function EventsTable({ events, onRowClick }: EventsTableProps) {
+export function EventsTable({ events, onRowClick, onRefresh }: EventsTableProps) {
   const formatDate = (dateString: string) => {
     const date = new Date(dateString)
     return new Intl.DateTimeFormat('pt-BR', {
-      day: '2-digit',
-      month: '2-digit',
-      hour: '2-digit',
-      minute: '2-digit',
-      second: '2-digit',
+      day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit', second: '2-digit',
     }).format(date)
   }
 
-  const getSafeTypeConfig = (type: string) => {
-    return typeConfig[type as keyof typeof typeConfig] || typeConfig['INFO']
-  }
+  const getSafeTypeConfig = (type: string) => typeConfig[type as keyof typeof typeConfig] || typeConfig['INFO']
+  const getSafeStatusConfig = (status: string) => statusConfig[status as keyof typeof statusConfig] || statusConfig['NEW']
 
-  const getSafeStatusConfig = (status: string) => {
-    return statusConfig[status as keyof typeof statusConfig] || statusConfig['NEW']
-  }
-
-  // Função para adicionar à whitelist (Falso Positivo)
   const handleMarkFalsePositive = async (event: Anomaly) => {
     try {
       const rule = {
-        eventId: event.id, // <-- NOVO CAMPO ADICIONADO AQUI
+        eventId: event.id,
         endpoint: event.endpoint || '/',
         statusCode: event.statusCode ? String(event.statusCode) : '200',
         bodySize: (event as any).bodySize ? String((event as any).bodySize) : '0' 
@@ -103,8 +73,13 @@ export function EventsTable({ events, onRowClick }: EventsTableProps) {
       
       await addWhitelistRule(rule)
       
-      // Feedback rápido na tela
       alert(`✅ Rota ${rule.endpoint} (Status ${rule.statusCode}) adicionada à Whitelist com sucesso! O Agente IA passará a ignorá-la.`)
+      
+      // <-- NOVO: Chama a função do pai para recarregar a tabela
+      if (onRefresh) {
+        onRefresh()
+      }
+      
     } catch (error) {
       console.error('Erro ao adicionar à whitelist:', error)
       alert('❌ Ocorreu um erro ao tentar marcar como falso positivo.')
@@ -200,7 +175,6 @@ export function EventsTable({ events, onRowClick }: EventsTableProps) {
                             Ver detalhes
                           </DropdownMenuItem>
                           
-                          {/* Botão de Falso Positivo (Whitelist) */}
                           <DropdownMenuItem 
                             onClick={() => handleMarkFalsePositive(event)}
                             className="text-green-500 focus:text-green-500"
@@ -208,7 +182,6 @@ export function EventsTable({ events, onRowClick }: EventsTableProps) {
                             <CheckCircle2 className="w-4 h-4 mr-2" />
                             Descartar (Falso Positivo)
                           </DropdownMenuItem>
-
                         </DropdownMenuContent>
                       </DropdownMenu>
                     </TableCell>

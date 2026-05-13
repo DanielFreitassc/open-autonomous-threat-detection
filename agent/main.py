@@ -5,6 +5,9 @@ import os
 import joblib
 import requests
 import psycopg2
+import threading
+from flask import Flask, request, jsonify
+from flask_cors import CORS # Importação do CORS
 from datetime import datetime
 from collections import Counter
 from sklearn.ensemble import IsolationForest
@@ -13,7 +16,7 @@ from dotenv import load_dotenv
 # Carrega as variáveis do arquivo .env
 load_dotenv()
 
-# --- CONFIGURAÇÕES ---
+# --- CONFIGURAÇÕES DO AGENTE ---
 IP_LISTEN = os.getenv("IP_LISTEN", "0.0.0.0")
 PORT_LISTEN = int(os.getenv("PORT_LISTEN", 5140))
 BUFFER_SIZE = 2048
@@ -21,9 +24,13 @@ ARQUIVO_MODELO = "modelo_ia.pkl"
 ARQUIVO_FREQUENCIAS = "frequencia_rotas.pkl"
 LIMITE_LOGS_TREINO = 9000 
 
-# API E BANCO
+# --- CONFIGURAÇÕES REST (FLASK) ---
+FLASK_PORT = int(os.getenv("FLASK_PORT", 5000))
+ADMIN_PASSWORD = os.getenv("ADMIN_PASSWORD", "SuperSenha2026") 
+
+# --- API E BANCO ---
 API_ENDPOINT = os.getenv("API_ENDPOINT", "http://localhost:8080/api/v1/events")
-BEARER_TOKEN = os.getenv("API_TOKEN", "")
+BEARER_TOKEN = os.getenv("API_TOKEN", "") 
 
 # Configuração do DB
 DB_CONFIG = {
@@ -35,6 +42,44 @@ DB_CONFIG = {
 }
 
 MIN_PORCENTAGEM_ROTA = 0.05 
+
+# --- INICIALIZAÇÃO DO FLASK (API EMBUTIDA) ---
+app = Flask(__name__)
+CORS(app) # Habilita o CORS para todas as rotas do Flask
+
+@app.route('/api/config/token', methods=['POST', 'OPTIONS']) # Adicionado OPTIONS por garantia
+def update_token():
+    """Endpoint REST para atualizar o token em tempo real via Body."""
+    global BEARER_TOKEN 
+    
+    # Se for uma requisição de preflight do CORS (OPTIONS), o flask-cors já cuida disso,
+    # mas caso precise customizar, a rota já aceita o método.
+    if request.method == 'OPTIONS':
+        return jsonify({}), 200
+
+    # Extrai todo o corpo do JSON
+    dados = request.get_json()
+
+    # 1. Valida se o payload contém os dados necessários
+    if not dados or 'token' not in dados or 'adminPassword' not in dados:
+        return jsonify({"erro": "Os campos 'token' e 'adminPassword' são obrigatórios no corpo da requisição."}), 400
+
+    # 2. Valida a senha lida do Body
+    if dados['adminPassword'] != ADMIN_PASSWORD:
+        print("⚠️ Tentativa de atualização de token falhou: Senha incorreta.")
+        return jsonify({"erro": "Acesso negado: Senha incorreta."}), 401
+
+    # 3. Substitui o token antigo
+    BEARER_TOKEN = dados['token']
+    print(f"\n🔐 Sucesso! Token atualizado via REST. Novo tamanho: {len(BEARER_TOKEN)} caracteres.")
+    return jsonify({"mensagem": "Token atualizado com sucesso!"}), 200
+
+def run_flask():
+    """Roda o servidor web na porta definida, desativando os logs padrões."""
+    import logging
+    log = logging.getLogger('werkzeug')
+    log.setLevel(logging.ERROR)
+    app.run(host='0.0.0.0', port=FLASK_PORT, debug=False, use_reloader=False)
 
 # --- FUNÇÕES DE APOIO ---
 
@@ -83,17 +128,18 @@ def extrair_dados_log(log_msg):
 
 def enviar_alerta_rest(log_line, rota, features_ia, motivo, dados_extras):
     """Monta o payload JSON atualizado e envia para o backend centralizado."""
+    global BEARER_TOKEN
     timestamp = datetime.now().isoformat()
     
     payload = {
         "events": {
             "timestamp": timestamp,
             "category": "web_attack",
-            "type": "comportamento_suspeito", # Ajustável conforme a detecção
+            "type": "comportamento_suspeito", 
             "outcome": "detected"
         },
         "features": {
-            "requestRate": 0.0, # Placeholder para expansão futura
+            "requestRate": 0.0,
             "failedLoginCount": 0,
             "geoDistanceKm": 0.0
         },
@@ -101,8 +147,8 @@ def enviar_alerta_rest(log_line, rota, features_ia, motivo, dados_extras):
             {
                 "method": dados_extras["method"],
                 "endpoint": rota,
-                "statusCode": str(features_ia[0]), # StatusCode como String
-                "bodySize": str(features_ia[1]),   # Novo campo bodySize como String
+                "statusCode": str(features_ia[0]), 
+                "bodySize": str(features_ia[1]),  
                 "protocol": dados_extras["protocol"]
             }
         ],
@@ -131,12 +177,14 @@ def enviar_alerta_rest(log_line, rota, features_ia, motivo, dados_extras):
         response = requests.post(API_ENDPOINT, json=payload, headers=headers, timeout=5)
         if response.status_code in [200, 201, 202]:
             print(f"📡 Alerta enviado via REST! Status: {response.status_code}")
+        elif response.status_code in [401, 403]:
+            print(f"⚠️ Erro na API (Não Autorizado): O Token atual expirou ou é inválido!")
         else:
             print(f"⚠️ Erro na API: {response.status_code} - {response.text}")
     except Exception as e:
-        print(f"❌ Falha de conexão: {e}")
+        print(f"❌ Falha de conexão ao enviar alerta: {e}")
 
-# --- INICIALIZAÇÃO ---
+# --- INICIALIZAÇÃO DOS MODELOS DE ML ---
 
 if os.path.exists(ARQUIVO_MODELO):
     model = joblib.load(ARQUIVO_MODELO)
@@ -146,13 +194,20 @@ else:
     model = IsolationForest(contamination=0.05, random_state=42)
     fase_treino_ativa = True
 
-sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-sock.bind((IP_LISTEN, PORT_LISTEN))
 coletados_treino, rotas_treino = [], []
 
-print(f"🚀 Agente IA ativo em {IP_LISTEN}:{PORT_LISTEN}")
+# --- INICIANDO AS THREADS E O SOCKET UDP ---
 
-# --- LOOP PRINCIPAL ---
+# 1. Inicia o Flask em uma Thread (Para não bloquear o código)
+threading.Thread(target=run_flask, daemon=True).start()
+print(f"🌐 Servidor de Configuração (Flask) ativo na porta {FLASK_PORT}")
+
+# 2. Inicia o Socket UDP Syslog
+sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+sock.bind((IP_LISTEN, PORT_LISTEN))
+print(f"🚀 Agente IA escutando logs UDP em {IP_LISTEN}:{PORT_LISTEN}")
+
+# --- LOOP PRINCIPAL (SYSLOG) ---
 
 try:
     while True:

@@ -69,6 +69,7 @@ services:
     tty: true
     ports:
       - "5140:5140/udp"
+      - "5000:5000"
     volumes:
       - ./agent:/app
     environment:
