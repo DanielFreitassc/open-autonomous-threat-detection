@@ -3,7 +3,9 @@ package com.danielfreitassc.backend.services.whitelist;
 import java.util.UUID;
 
 import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -42,7 +44,16 @@ public class WhitelistService {
     }
 
     public Page<WhitelistResponseDto> getWhitelist(Pageable pageable) {
-        return whitelistRepository.findAll(pageable).map(whitelistMapper::toDto);
+        
+        // Recria o Pageable forçando a ordenação pelo campo 'createdAt' (Ascendente)
+        Pageable sortedPageable = PageRequest.of(
+                pageable.getPageNumber(),
+                pageable.getPageSize(),
+                Sort.by("createdAt").ascending() 
+        );
+
+        // Usa o findAll() nativo do JpaRepository
+        return whitelistRepository.findAll(sortedPageable).map(whitelistMapper::toDto);
     }
 
     @Transactional 

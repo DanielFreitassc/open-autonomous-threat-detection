@@ -1,5 +1,6 @@
 package com.danielfreitassc.backend.models.whitelist;
 
+import java.time.LocalDateTime;
 import java.util.UUID;
 
 import jakarta.persistence.Entity;
@@ -25,4 +26,5 @@ public class WhitelistEntity {
     private String endpoint;
     private String statusCode;
     private String bodySize;
+    private LocalDateTime createdAt;
 }

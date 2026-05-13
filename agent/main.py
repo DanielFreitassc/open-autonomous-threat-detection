@@ -7,7 +7,7 @@ import requests
 import psycopg2
 import threading
 from flask import Flask, request, jsonify
-from flask_cors import CORS # Importação do CORS
+from flask_cors import CORS
 from datetime import datetime
 from collections import Counter
 from sklearn.ensemble import IsolationForest
@@ -22,7 +22,7 @@ PORT_LISTEN = int(os.getenv("PORT_LISTEN", 5140))
 BUFFER_SIZE = 2048
 ARQUIVO_MODELO = "modelo_ia.pkl"
 ARQUIVO_FREQUENCIAS = "frequencia_rotas.pkl"
-LIMITE_LOGS_TREINO = 9000 
+LIMITE_LOGS_TREINO = 1000 
 
 # --- CONFIGURAÇÕES REST (FLASK) ---
 FLASK_PORT = int(os.getenv("FLASK_PORT", 5000))
@@ -47,29 +47,23 @@ MIN_PORCENTAGEM_ROTA = 0.05
 app = Flask(__name__)
 CORS(app) # Habilita o CORS para todas as rotas do Flask
 
-@app.route('/api/config/token', methods=['POST', 'OPTIONS']) # Adicionado OPTIONS por garantia
+@app.route('/api/config/token', methods=['POST', 'OPTIONS'])
 def update_token():
     """Endpoint REST para atualizar o token em tempo real via Body."""
     global BEARER_TOKEN 
     
-    # Se for uma requisição de preflight do CORS (OPTIONS), o flask-cors já cuida disso,
-    # mas caso precise customizar, a rota já aceita o método.
     if request.method == 'OPTIONS':
         return jsonify({}), 200
 
-    # Extrai todo o corpo do JSON
     dados = request.get_json()
 
-    # 1. Valida se o payload contém os dados necessários
     if not dados or 'token' not in dados or 'adminPassword' not in dados:
         return jsonify({"erro": "Os campos 'token' e 'adminPassword' são obrigatórios no corpo da requisição."}), 400
 
-    # 2. Valida a senha lida do Body
     if dados['adminPassword'] != ADMIN_PASSWORD:
         print("⚠️ Tentativa de atualização de token falhou: Senha incorreta.")
         return jsonify({"erro": "Acesso negado: Senha incorreta."}), 401
 
-    # 3. Substitui o token antigo
     BEARER_TOKEN = dados['token']
     print(f"\n🔐 Sucesso! Token atualizado via REST. Novo tamanho: {len(BEARER_TOKEN)} caracteres.")
     return jsonify({"mensagem": "Token atualizado com sucesso!"}), 200
@@ -83,22 +77,38 @@ def run_flask():
 
 # --- FUNÇÕES DE APOIO ---
 
-def verificar_whitelist_banco(endpoint, status, tamanho):
-    """Verifica se a combinação existe na whitelist do banco."""
+def verificar_whitelist_banco(endpoint, status, tamanho_atual):
+    """Verifica a whitelist com uma margem de tolerância de 15% no tamanho do body."""
     try:
         conn = psycopg2.connect(**DB_CONFIG)
         cur = conn.cursor()
-        query = """
-            SELECT EXISTS(
-                SELECT 1 FROM whitelist 
-                WHERE endpoint = %s AND status_code = %s AND body_size = %s
-            )
-        """
-        cur.execute(query, (endpoint, str(status), str(tamanho)))
-        existe = cur.fetchone()[0]
+        
+        # Pega o tamanho base que o admin salvou como "normal" na Whitelist
+        query = "SELECT body_size FROM whitelist WHERE endpoint = %s AND status_code = %s"
+        cur.execute(query, (endpoint, str(status)))
+        resultado = cur.fetchone()
         cur.close()
         conn.close()
-        return existe
+        
+        # Se encontrou a rota e o status na whitelist
+        if resultado:
+            tamanho_salvo = int(resultado[0])
+            
+            # Se o tamanho for 0 (caso queira uma regra coringa que ignora tamanho)
+            if tamanho_salvo == 0:
+                return True
+                
+            # Calcula a diferença percentual entre o log atual e o salvo na regra
+            diferenca = abs(tamanho_atual - tamanho_salvo)
+            margem_tolerancia = tamanho_salvo * 0.15 # 15% de tolerância
+            
+            if diferenca <= margem_tolerancia:
+                return True # É só a variação normal da página (Falso Positivo)
+            else:
+                print(f"⚠️ Whitelist ignorada para {endpoint}: Variação suspeita! (Esperado: ~{tamanho_salvo}, Atual: {tamanho_atual})")
+                return False # Saiu da margem, deixa a IA analisar!
+                
+        return False
     except Exception as e:
         print(f"⚠️ Erro ao consultar banco: {e}")
         return False
@@ -198,11 +208,9 @@ coletados_treino, rotas_treino = [], []
 
 # --- INICIANDO AS THREADS E O SOCKET UDP ---
 
-# 1. Inicia o Flask em uma Thread (Para não bloquear o código)
 threading.Thread(target=run_flask, daemon=True).start()
 print(f"🌐 Servidor de Configuração (Flask) ativo na porta {FLASK_PORT}")
 
-# 2. Inicia o Socket UDP Syslog
 sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
 sock.bind((IP_LISTEN, PORT_LISTEN))
 print(f"🚀 Agente IA escutando logs UDP em {IP_LISTEN}:{PORT_LISTEN}")
@@ -232,7 +240,7 @@ try:
                 print("\n✅ Treino concluído!")
             continue
 
-        # 1. VERIFICAÇÃO DE WHITELIST NO BANCO
+        # 1. VERIFICAÇÃO DE WHITELIST NO BANCO COM TOLERÂNCIA
         if verificar_whitelist_banco(rota, features_ia[0], features_ia[1]):
             print(f"✅ Ignorado (Whitelist): {rota}")
             continue

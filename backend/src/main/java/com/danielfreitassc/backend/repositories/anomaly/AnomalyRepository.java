@@ -8,6 +8,6 @@ import org.springframework.data.jpa.repository.JpaRepository;
 import com.danielfreitassc.backend.models.anomaly.AnomalyEntity;
 
 public interface AnomalyRepository extends JpaRepository<AnomalyEntity, UUID> {
-    Optional<AnomalyEntity> findByEventsEntityId(UUID eventId);
+    Optional<AnomalyEntity> findByEventsEntityIdOrderByTimestampDesc(UUID eventId);
     void deleteByEventsEntityId(UUID eventId);
 }

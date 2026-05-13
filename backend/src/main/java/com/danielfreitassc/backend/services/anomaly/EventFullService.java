@@ -3,7 +3,9 @@ package com.danielfreitassc.backend.services.anomaly;
 import java.util.UUID;
 
 import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -40,7 +42,14 @@ public class EventFullService {
     }
 
     public Page<EventFullResponseDto> getAll(Pageable pageable) {
-        return eventsRepository.findByFalsePositiveFalse(pageable).map(this::mapToResponseDto);
+        // Recria o Pageable forçando a ordenação decrescente pelo campo 'timestamp'
+        Pageable sortedPageable = PageRequest.of(
+                pageable.getPageNumber(),
+                pageable.getPageSize(),
+                Sort.by("timestamp").descending()
+        );
+
+        return eventsRepository.findByFalsePositiveFalse(sortedPageable).map(this::mapToResponseDto);
     }
 
     public EventFullResponseDto getById(UUID id) {
