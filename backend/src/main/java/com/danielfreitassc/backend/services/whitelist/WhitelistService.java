@@ -53,7 +53,7 @@ public class WhitelistService {
         );
 
         // Usa o findAll() nativo do JpaRepository
-        return whitelistRepository.findAll(sortedPageable).map(whitelistMapper::toDto);
+        return whitelistRepository.findAllByOrderByCreatedAtAsc(sortedPageable).map(whitelistMapper::toDto);
     }
 
     @Transactional 

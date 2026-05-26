@@ -10,5 +10,5 @@ import com.danielfreitassc.backend.models.whitelist.WhitelistEntity;
 
 public interface WhitelistRepository extends JpaRepository<WhitelistEntity, UUID>{
     
-    Page<WhitelistEntity> findAllOrderByCreatedAtAsc(Pageable pageable);
+    Page<WhitelistEntity> findAllByOrderByCreatedAtAsc(Pageable pageable);
 }

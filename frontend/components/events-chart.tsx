@@ -20,10 +20,11 @@ interface EventsChartProps {
 
 export function EventsChart({ events }: EventsChartProps) {
   const chartData = useMemo(() => {
+    // 1. Cria a estrutura vazia das últimas 24 horas
     const last24Hours = Array.from({ length: 24 }, (_, i) => {
       const date = new Date()
       date.setHours(date.getHours() - (23 - i))
-      date.setMinutes(0, 0, 0)
+      date.setMinutes(0, 0, 0, 0) // Zera minutos, segundos e milissegundos para precisão
       return {
         hour: date.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }),
         timestamp: date.getTime(),
@@ -35,19 +36,22 @@ export function EventsChart({ events }: EventsChartProps) {
       }
     })
 
+    // 2. Popula os buckets com os eventos
     events.forEach((event) => {
+      // Arredonda a hora do evento para comparar com o bucket exato
       const eventDate = new Date(event.timestamp)
-      const eventHour = eventDate.getTime()
+      eventDate.setMinutes(0, 0, 0, 0) 
+      const eventHourTime = eventDate.getTime()
 
-      for (let i = 0; i < last24Hours.length - 1; i++) {
-        if (eventHour >= last24Hours[i].timestamp && eventHour < last24Hours[i + 1].timestamp) {
-          last24Hours[i].total++
-          if (event.type === 'CRITICAL') last24Hours[i].critical++
-          else if (event.type === 'HIGH') last24Hours[i].high++
-          else if (event.type === 'MEDIUM') last24Hours[i].medium++
-          else if (event.type === 'LOW') last24Hours[i].low++
-          break
-        }
+      // Encontra o bucket correspondente àquela hora exata com .find() em vez de loop
+      const targetBucket = last24Hours.find(bucket => bucket.timestamp === eventHourTime)
+
+      if (targetBucket) {
+        targetBucket.total++
+        if (event.type === 'CRITICAL') targetBucket.critical++
+        else if (event.type === 'HIGH') targetBucket.high++
+        else if (event.type === 'MEDIUM') targetBucket.medium++
+        else if (event.type === 'LOW') targetBucket.low++
       }
     })
 
@@ -57,7 +61,7 @@ export function EventsChart({ events }: EventsChartProps) {
   return (
     <Card className="border-border bg-card">
       <CardHeader className="pb-2">
-        <CardTitle className="text-base font-medium">Eventos nas Ultimas 24 Horas</CardTitle>
+        <CardTitle className="text-base font-medium">Eventos nas Últimas 24 Horas</CardTitle>
       </CardHeader>
       <CardContent>
         <div className="h-[280px]">
@@ -108,7 +112,7 @@ export function EventsChart({ events }: EventsChartProps) {
               <Area
                 type="monotone"
                 dataKey="critical"
-                name="Critico"
+                name="Crítico"
                 stroke="#ef4444"
                 fillOpacity={1}
                 fill="url(#colorCritical)"
@@ -126,7 +130,7 @@ export function EventsChart({ events }: EventsChartProps) {
               <Area
                 type="monotone"
                 dataKey="medium"
-                name="Medio"
+                name="Médio"
                 stroke="#eab308"
                 fillOpacity={1}
                 fill="url(#colorMedium)"
