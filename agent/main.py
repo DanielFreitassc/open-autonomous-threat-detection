@@ -6,6 +6,7 @@ import joblib
 import requests
 import psycopg2
 import threading
+import time # Importado para calcular os milissegundos
 from flask import Flask, request, jsonify
 from flask_cors import CORS
 from datetime import datetime
@@ -45,7 +46,7 @@ MIN_PORCENTAGEM_ROTA = 0.05
 
 # --- INICIALIZAÇÃO DO FLASK (API EMBUTIDA) ---
 app = Flask(__name__)
-CORS(app) # Habilita o CORS para todas as rotas do Flask
+CORS(app) 
 
 @app.route('/api/config/token', methods=['POST', 'OPTIONS'])
 def update_token():
@@ -83,30 +84,25 @@ def verificar_whitelist_banco(endpoint, status, tamanho_atual):
         conn = psycopg2.connect(**DB_CONFIG)
         cur = conn.cursor()
         
-        # Pega o tamanho base que o admin salvou como "normal" na Whitelist
         query = "SELECT body_size FROM whitelist WHERE endpoint = %s AND status_code = %s"
         cur.execute(query, (endpoint, str(status)))
         resultado = cur.fetchone()
         cur.close()
         conn.close()
         
-        # Se encontrou a rota e o status na whitelist
         if resultado:
             tamanho_salvo = int(resultado[0])
-            
-            # Se o tamanho for 0 (caso queira uma regra coringa que ignora tamanho)
             if tamanho_salvo == 0:
                 return True
                 
-            # Calcula a diferença percentual entre o log atual e o salvo na regra
             diferenca = abs(tamanho_atual - tamanho_salvo)
-            margem_tolerancia = tamanho_salvo * 0.15 # 15% de tolerância
+            margem_tolerancia = tamanho_salvo * 0.15 
             
             if diferenca <= margem_tolerancia:
-                return True # É só a variação normal da página (Falso Positivo)
+                return True 
             else:
                 print(f"⚠️ Whitelist ignorada para {endpoint}: Variação suspeita! (Esperado: ~{tamanho_salvo}, Atual: {tamanho_atual})")
-                return False # Saiu da margem, deixa a IA analisar!
+                return False 
                 
         return False
     except Exception as e:
@@ -149,7 +145,7 @@ def enviar_alerta_rest(log_line, rota, features_ia, motivo, dados_extras):
             "outcome": "detected"
         },
         "features": {
-            "requestRate": 0.0,
+            "requestRate": features_ia[2], # Delta-T enviado para o Spring Boot
             "failedLoginCount": 0,
             "geoDistanceKm": 0.0
         },
@@ -176,7 +172,7 @@ def enviar_alerta_rest(log_line, rota, features_ia, motivo, dados_extras):
             "rule": "Regra IA - Desvio de Padrão",
             "severity": "HIGH",
             "title": motivo,
-            "description": f"A rota {rota} disparou um alerta. Modelo de ML classificou como anomalia.",
+            "description": f"A rota {rota} disparou um alerta. Motivo: {motivo}",
             "timestamp": timestamp
         }
     }
@@ -205,6 +201,8 @@ else:
     fase_treino_ativa = True
 
 coletados_treino, rotas_treino = [], []
+ultimo_acesso_ip = {} # Memória agora vai guardar um dicionário com "tempo" e "burst"
+contador_limpeza = 0  # Controla a frequência da limpeza de memória
 
 # --- INICIANDO AS THREADS E O SOCKET UDP ---
 
@@ -225,12 +223,41 @@ try:
 
         if not features_ia: continue
 
+        # --- LÓGICA DE TEMPO E MEMÓRIA (DELTA-T E BURST) ---
+        agora = time.time()
+        ip_origem = dados_extras["ip"]
+        
+        delta_t = 10.0 
+        burst_atual = 0 # Inicia o contador de rajada
+        
+        if ip_origem in ultimo_acesso_ip:
+            delta_t = agora - ultimo_acesso_ip[ip_origem]["tempo"]
+            burst_atual = ultimo_acesso_ip[ip_origem]["burst"]
+            
+        # Avalia se a requisição faz parte de uma rajada rápida
+        if delta_t < 0.5:
+            burst_atual += 1
+        else:
+            burst_atual = 0 # Humano pausou para ler a tela, reseta o contador
+            
+        # Salva o tempo e a rajada atualizada na memória
+        ultimo_acesso_ip[ip_origem] = {"tempo": agora, "burst": burst_atual}
+        features_ia.append(delta_t) # features_ia agora é: [status, tamanho, delta_t]
+
+        # Limpeza periódica do dicionário para evitar estouro de RAM
+        contador_limpeza += 1
+        if contador_limpeza >= 5000:
+            limite_inatividade = agora - 3600 # Remove IPs inativos há mais de 1 hora
+            ultimo_acesso_ip = {ip: dados for ip, dados in ultimo_acesso_ip.items() if dados["tempo"] > limite_inatividade}
+            contador_limpeza = 0
+
+        # --- FASE DE TREINAMENTO ---
         if fase_treino_ativa:
             coletados_treino.append(features_ia)
             rotas_treino.append(rota)
             print(f"📖 Aprendendo: {len(coletados_treino)}/{LIMITE_LOGS_TREINO}", end='\r')
             if len(coletados_treino) >= LIMITE_LOGS_TREINO:
-                df_treino = pd.DataFrame(coletados_treino, columns=['status', 'tamanho'])
+                df_treino = pd.DataFrame(coletados_treino, columns=['status', 'tamanho', 'delta_t'])
                 model.fit(df_treino)
                 joblib.dump(model, ARQUIVO_MODELO)
                 c = Counter(rotas_treino)
@@ -240,23 +267,37 @@ try:
                 print("\n✅ Treino concluído!")
             continue
 
-        # 1. VERIFICAÇÃO DE WHITELIST NO BANCO COM TOLERÂNCIA
-        if verificar_whitelist_banco(rota, features_ia[0], features_ia[1]):
-            print(f"✅ Ignorado (Whitelist): {rota}")
-            continue
-
-        # 2. DETECÇÃO
+        # --- ESTRATÉGIA DE DEFESA EM PROFUNDIDADE ---
+        
         is_anomalia = False
-        if frequencia_rotas.get(rota, 0.0) < MIN_PORCENTAGEM_ROTA:
-            is_anomalia, motivo = True, f"ROTA INCOMUM (Acessada {frequencia_rotas.get(rota, 0.0)*100:.2f}% das vezes)"
-        else:
-            df_feat = pd.DataFrame([features_ia], columns=['status', 'tamanho'])
-            if model.predict(df_feat)[0] == -1:
-                is_anomalia, motivo = True, "COMPORTAMENTO ANÔMALO (Isolation Forest)"
+        motivo = ""
+        LIMITE_BURST = 15 # Limite de requisições super rápidas aceitáveis em um carregamento de página
 
-        # 3. ENVIO DO ALERTA FORMATADO
+        # 1. ESCUDO ANTI-BOT (Prioridade Máxima)
+        # Se a rajada passar do limite humano aceitável, é ataque.
+        if burst_atual > LIMITE_BURST:
+            is_anomalia = True
+            motivo = f"COMPORTAMENTO DE BOT (Rajada abusiva de {burst_atual} requisições seguidas. Delta-T: {delta_t:.3f}s)"
+
+        # 2. VERIFICAÇÃO DE WHITELIST (Aplicada apenas para comportamento não-bot)
+        if not is_anomalia:
+            if verificar_whitelist_banco(rota, features_ia[0], features_ia[1]):
+                print(f"✅ Ignorado (Whitelist): {rota}")
+                continue # Pula o fluxo, pois é acesso humano em rota confiável
+
+        # 3. DETECÇÃO DA IA (Aplicada em rotas que não estão na whitelist)
+        if not is_anomalia:
+            if frequencia_rotas.get(rota, 0.0) < MIN_PORCENTAGEM_ROTA:
+                is_anomalia, motivo = True, f"ROTA INCOMUM (Acessada {frequencia_rotas.get(rota, 0.0)*100:.2f}% das vezes)"
+            else:
+                # O IsolationForest analisa status, tamanho e o delta_t para encontrar variações mais sutis
+                df_feat = pd.DataFrame([features_ia], columns=['status', 'tamanho', 'delta_t'])
+                if model.predict(df_feat)[0] == -1:
+                    is_anomalia, motivo = True, "COMPORTAMENTO ANÔMALO (Isolation Forest: Status, Tamanho ou Tempo suspeito)"
+
+        # 4. ENVIO DO ALERTA FORMATADO
         if is_anomalia:
-            print(f"⚠️ ANOMALIA DETECTADA: {rota}")
+            print(f"⚠️ ANOMALIA DETECTADA: {rota} - {motivo}")
             enviar_alerta_rest(log_line, rota, features_ia, motivo, dados_extras)
 
 except KeyboardInterrupt:
