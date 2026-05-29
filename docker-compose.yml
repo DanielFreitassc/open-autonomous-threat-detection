@@ -7,11 +7,11 @@ services:
     container_name: open_autonomous_db
     restart: unless-stopped
     environment:
-      POSTGRES_USER: admin
-      POSTGRES_PASSWORD: admin
-      POSTGRES_DB: db
+      POSTGRES_USER: ${DB_USER}
+      POSTGRES_PASSWORD: ${DB_PASSWORD}
+      POSTGRES_DB: ${DB_NAME}
     ports:
-      - "5432:5432"
+      - "${DB_PORT}:5432"
     volumes:
       - db:/var/lib/postgresql/data
     networks:
@@ -29,9 +29,9 @@ services:
     ports:
       - "8080:8080"
     environment:
-      - SPRING_DATASOURCE_URL=jdbc:postgresql://postgres:5432/db
-      - SPRING_DATASOURCE_USERNAME=admin
-      - SPRING_DATASOURCE_PASSWORD=admin
+      - SPRING_DATASOURCE_URL=${SPRING_DATASOURCE_URL}
+      - SPRING_DATASOURCE_USERNAME=${DB_USER}
+      - SPRING_DATASOURCE_PASSWORD=${DB_PASSWORD}
     depends_on:
       - postgres
     networks:
@@ -44,14 +44,14 @@ services:
     build:
       context: ./frontend
       dockerfile: Dockerfile
+      args:
+        - NEXT_PUBLIC_API_URL=${NEXT_PUBLIC_API_URL}
+        - NEXT_PUBLIC_AGENT_API_URL=${NEXT_PUBLIC_AGENT_API_URL}
     container_name: open_autonomous_frontend
     restart: unless-stopped
     ports:
       - "3000:3000"
-    environment:
-      # Lembre-se: em produção, substitua este valor por /api/v1 para usar o Nginx
-      - NEXT_PUBLIC_API_URL=/api/v1
-      - NEXT_PUBLIC_AGENT_API_URL=/api/config
+    
     depends_on:
       - backend
     networks:
@@ -65,25 +65,19 @@ services:
       context: ./agent
       dockerfile: Dockerfile
     container_name: ia_monitor_agent
-    # Modo Host: o container usa a interface de rede do servidor (Ubuntu)
-    network_mode: host
+    restart: unless-stopped
+    networks:
+      - rede_monitoramento
+    ports:
+      - "${PORT_LISTEN}:${PORT_LISTEN}/udp"
+      - "${FLASK_PORT}:${FLASK_PORT}"
     volumes:
       - ./agent:/app
-    environment:
-      - PYTHONUNBUFFERED=1
-      # COMO ESTAMOS NO HOST, PRECISAMOS APONTAR PARA O LOCALHOST DA MÁQUINA
-      # POIS O POSTGRES E O BACKEND ESTÃO MAPEADOS NAS PORTAS DO HOST (5432 e 8080)
-      - DB_HOST=127.0.0.1
-      - DB_PORT=5432
-      - DB_NAME=db
-      - DB_USER=admin
-      - DB_PASSWORD=admin
-      - API_ENDPOINT=http://127.0.0.1:8080/api/v1/events
-      - ADMIN_PASSWORD=SuperSenha2026
+    env_file:
+      - .env
     depends_on:
       - backend
       - postgres
-    restart: unless-stopped
 
 # ==========================================
 # CONFIGURAÇÕES DE REDE E VOLUMES
