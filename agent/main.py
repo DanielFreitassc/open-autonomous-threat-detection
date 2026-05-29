@@ -111,25 +111,34 @@ def verificar_whitelist_banco(endpoint, status, tamanho_atual):
 
 def extrair_dados_log(log_msg):
     dados_extras = {
-        "host": "unknown", "service": "unknown", "ip": "0.0.0.0", 
-        "method": "UNKNOWN", "protocol": "HTTP/1.1", "user_agent": "Unknown"
+        "host": "unknown", "service": "nginx", "ip": "0.0.0.0", 
+        "method": "UNKNOWN", "protocol": "HTTP/1.1", "user_agent": "N/A"
     }
     
-    syslog_match = re.search(r'<\d+>[A-Za-z]+\s+\d+\s+\d{2}:\d{2}:\d{2}\s+([^\s]+)\s+([^:]+):\s+([\d\.]+)', log_msg)
+    # Regex robusto para o log: busca o IP após 'nginx_access:'
+    # Captura: 1. Host, 2. IP
+    syslog_match = re.search(r'nginx_access:\s+([\d\.]+)', log_msg)
     if syslog_match:
-        dados_extras["host"], dados_extras["service"], dados_extras["ip"] = syslog_match.groups()
+        dados_extras["ip"] = syslog_match.group(1)
 
-    req_match = re.search(r'\"([A-Z]+) (.*?) (HTTP/\d\.\d)\" (\d{3}) (\d+)', log_msg)
+    # Regex para a requisição HTTP: busca Método, Rota, Protocolo, Status e Tamanho
+    # Formato: "GET /rota HTTP/1.1" 200 1234
+    req_match = re.search(r'\"([A-Z]+)\s+(.*?)\s+(HTTP/\d\.\d)\"\s+(\d{3})\s+(\d+)', log_msg)
     if req_match:
         dados_extras["method"] = req_match.group(1)
-        rota = req_match.group(2).split('?')[0]
+        rota = req_match.group(2).split('?')[0] # Remove query strings
         dados_extras["protocol"] = req_match.group(3)
-        status, tamanho = int(req_match.group(4)), int(req_match.group(5))
+        status = int(req_match.group(4))
+        tamanho = int(req_match.group(5))
         
-        ua_match = re.search(r'\"[A-Z]+ .*? HTTP/.*?\".*?\".*?\"\s+\"(.*?)\"', log_msg)
-        if ua_match: dados_extras["user_agent"] = ua_match.group(1)
+        # Tenta pegar User Agent se existir no final da string
+        ua_match = re.search(r'\"Mozilla.*?\"', log_msg)
+        if ua_match: 
+            dados_extras["user_agent"] = ua_match.group(0)
             
         return rota, [status, tamanho], dados_extras
+    
+    # Retorna None se não conseguir identificar a requisição
     return None, None, None
 
 def enviar_alerta_rest(log_line, rota, features_ia, motivo, dados_extras):

@@ -11,9 +11,9 @@ services:
       POSTGRES_PASSWORD: admin
       POSTGRES_DB: db
     ports:
-      - "5432:5432" 
+      - "5432:5432"
     volumes:
-      - postgres_data:/var/lib/postgresql/data
+      - db:/var/lib/postgresql/data
     networks:
       - rede_monitoramento
 
@@ -29,7 +29,6 @@ services:
     ports:
       - "8080:8080"
     environment:
-      # Sobrescreve o localhost para o nome do container do banco na rede Docker
       - SPRING_DATASOURCE_URL=jdbc:postgresql://postgres:5432/db
       - SPRING_DATASOURCE_USERNAME=admin
       - SPRING_DATASOURCE_PASSWORD=admin
@@ -50,8 +49,9 @@ services:
     ports:
       - "3000:3000"
     environment:
-      # URL que o browser usará para acessar a API (neste caso, localhost da máquina host)
-      - NEXT_PUBLIC_API_URL=http://localhost:8080/api/v1
+      # Lembre-se: em produção, substitua este valor por /api/v1 para usar o Nginx
+      - NEXT_PUBLIC_API_URL=/api/v1
+      - NEXT_PUBLIC_AGENT_API_URL=/api/config
     depends_on:
       - backend
     networks:
@@ -65,25 +65,25 @@ services:
       context: ./agent
       dockerfile: Dockerfile
     container_name: ia_monitor_agent
-    stdin_open: true
-    tty: true
-    ports:
-      - "5140:5140/udp"
-      - "5000:5000"
+    # Modo Host: o container usa a interface de rede do servidor (Ubuntu)
+    network_mode: host
     volumes:
       - ./agent:/app
     environment:
       - PYTHONUNBUFFERED=1
-      # Sobrescreve as configs do .env do agente para usar a rede do Docker
-      - DB_HOST=postgres 
-      - API_ENDPOINT=http://backend:8080/api/v1/events
+      # COMO ESTAMOS NO HOST, PRECISAMOS APONTAR PARA O LOCALHOST DA MÁQUINA
+      # POIS O POSTGRES E O BACKEND ESTÃO MAPEADOS NAS PORTAS DO HOST (5432 e 8080)
+      - DB_HOST=127.0.0.1
+      - DB_PORT=5432
+      - DB_NAME=db
+      - DB_USER=admin
+      - DB_PASSWORD=admin
+      - API_ENDPOINT=http://127.0.0.1:8080/api/v1/events
+      - ADMIN_PASSWORD=SuperSenha2026
     depends_on:
       - backend
       - postgres
     restart: unless-stopped
-    networks:
-      rede_monitoramento:
-        ipv4_address: 172.25.0.50
 
 # ==========================================
 # CONFIGURAÇÕES DE REDE E VOLUMES
@@ -97,5 +97,5 @@ networks:
         - subnet: 172.25.0.0/16
 
 volumes:
-  postgres_data:
+  db:
     name: db
