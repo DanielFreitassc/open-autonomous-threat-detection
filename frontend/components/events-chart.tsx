@@ -24,7 +24,7 @@ export function EventsChart({ events }: EventsChartProps) {
     const last24Hours = Array.from({ length: 24 }, (_, i) => {
       const date = new Date()
       date.setHours(date.getHours() - (23 - i))
-      date.setMinutes(0, 0, 0, 0) // Zera minutos, segundos e milissegundos para precisão
+      date.setMinutes(0, 0, 0) // Zera minutos, segundos e milissegundos para precisão
       return {
         hour: date.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }),
         timestamp: date.getTime(),
@@ -40,7 +40,7 @@ export function EventsChart({ events }: EventsChartProps) {
     events.forEach((event) => {
       // Arredonda a hora do evento para comparar com o bucket exato
       const eventDate = new Date(event.timestamp)
-      eventDate.setMinutes(0, 0, 0, 0) 
+      eventDate.setMinutes(0, 0, 0) 
       const eventHourTime = eventDate.getTime()
 
       // Encontra o bucket correspondente àquela hora exata com .find() em vez de loop
