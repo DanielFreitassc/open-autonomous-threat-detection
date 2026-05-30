@@ -68,13 +68,12 @@ services:
     ports:
       - "${PORT_LISTEN}:${PORT_LISTEN}/udp"
       - "${FLASK_PORT}:${FLASK_PORT}"
-    volumes:
-      - ./agent:/app
     env_file:
       - .env
     depends_on:
       - backend
       - postgres
+      
 
 # ==========================================
 # CONFIGURAÇÕES DE REDE E VOLUMES
