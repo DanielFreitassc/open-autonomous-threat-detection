@@ -147,17 +147,50 @@ def verificar_whitelist_banco(endpoint, status, tamanho_atual):
     margem = tamanho_salvo * 0.15
     return diferenca <= margem
 
+def get_severity(status_code):
+    """Classifica a severidade da anomalia com base no status HTTP."""
+    if status_code in [200, 206]:
+        return "CRITICAL"
+    elif status_code in [301, 302, 307, 308]:
+        return "HIGH"
+    elif status_code == 401:
+        return "MEDIUM"
+    elif status_code == 403:
+        return "MEDIUM"   # Baixa/Média na tabela, optamos por MEDIUM
+    elif status_code == 404:
+        return "LOW"
+    elif status_code == 500:
+        return "MEDIUM"
+    elif status_code in [502, 503, 504]:
+        return "MEDIUM"
+    else:
+        return "HIGH"      # desconhecido, trata como alta
+
 def extrair_dados_log(log_msg):
-    """Extrai features do log, com tratamento correto para tamanho (-) e rotas."""
+    """
+    Extrai features do log, com tratamento correto para tamanho (-), rotas e hostname.
+    Retorna: (rota, [status, tamanho], dados_extras)
+    """
     dados_extras = {
-        "host": "unknown", "service": "nginx", "ip": "0.0.0.0",
-        "method": "UNKNOWN", "protocol": "HTTP/1.1", "user_agent": "N/A"
+        "host": "unknown",      # Será preenchido com o hostname do syslog
+        "service": "nginx",
+        "ip": "0.0.0.0",
+        "method": "UNKNOWN",
+        "protocol": "HTTP/1.1",
+        "user_agent": "N/A"
     }
 
+    # 1. Extrai o hostname do syslog (ex.: "vm")
+    host_match = re.search(r'<\d+>\S+\s+\d+\s+\S+\s+(\S+)\s+nginx_access:', log_msg)
+    if host_match:
+        dados_extras["host"] = host_match.group(1)
+
+    # 2. IP do cliente (ainda extraído do conteúdo)
     syslog_match = re.search(r'nginx_access:\s+([\d\.]+)', log_msg)
     if syslog_match:
         dados_extras["ip"] = syslog_match.group(1)
 
+    # 3. Método, rota, protocolo, status, tamanho
     req_match = re.search(r'\"([A-Z]+)\s+(.*?)\s+(HTTP/\d\.\d)\"\s+(\d{3})\s+(\d+|-)', log_msg)
     if req_match:
         dados_extras["method"] = req_match.group(1)
@@ -170,6 +203,7 @@ def extrair_dados_log(log_msg):
         tamanho_str = req_match.group(5)
         tamanho = 0 if tamanho_str == '-' else int(tamanho_str)
 
+        # User-Agent (último campo entre aspas)
         campos = re.findall(r'"([^"]*)"', log_msg)
         if campos:
             dados_extras["user_agent"] = campos[-1]
@@ -182,6 +216,8 @@ def enviar_alerta_rest(log_line, rota, features_ia, motivo, dados_extras):
     """Monta o payload JSON e envia para o backend centralizado."""
     global BEARER_TOKEN
     timestamp = datetime.now().isoformat()
+    status_code = features_ia[0]
+    severity = get_severity(status_code)
 
     payload = {
         "events": {
@@ -199,7 +235,7 @@ def enviar_alerta_rest(log_line, rota, features_ia, motivo, dados_extras):
             {
                 "method": dados_extras["method"],
                 "endpoint": rota,
-                "statusCode": str(features_ia[0]),
+                "statusCode": str(status_code),
                 "bodySize": str(features_ia[1]),
                 "protocol": dados_extras["protocol"]
             }
@@ -210,13 +246,13 @@ def enviar_alerta_rest(log_line, rota, features_ia, motivo, dados_extras):
         "sourcers": {
             "service": dados_extras["service"],
             "engine": "IA-Central",
-            "host": dados_extras["host"],
+            "host": dados_extras["host"],        # Agora é o hostname real (ex.: vm)
             "clientIp": dados_extras["ip"],
             "userAgent": dados_extras["user_agent"]
         },
         "anomaly": {
             "rule": "Regra IA - Desvio de Padrão",
-            "severity": "HIGH",
+            "severity": severity,                # Severidade dinâmica
             "title": motivo,
             "description": f"A rota {rota} disparou um alerta. Motivo: {motivo}",
             "timestamp": timestamp

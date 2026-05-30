@@ -12,51 +12,25 @@ import {
   Legend,
 } from 'recharts'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
-import type { Anomaly } from '@/types/index'
+import type { EventStatsCountResponseDto } from '@/types/index' // Ajuste o caminho conforme seu projeto
 
 interface EventsChartProps {
-  events: Anomaly[]
+  stats: EventStatsCountResponseDto[]
 }
 
-export function EventsChart({ events }: EventsChartProps) {
+export function EventsChart({ stats }: EventsChartProps) {
+  // Apenas formata o timestamp que veio do backend para exibir a string de hora no gráfico
   const chartData = useMemo(() => {
-    // 1. Cria a estrutura vazia das últimas 24 horas
-    const last24Hours = Array.from({ length: 24 }, (_, i) => {
-      const date = new Date()
-      date.setHours(date.getHours() - (23 - i))
-      date.setMinutes(0, 0, 0) // Zera minutos, segundos e milissegundos para precisão
+    if (!stats || stats.length === 0) return [];
+
+    return stats.map((stat) => {
+      const date = new Date(stat.timestamp)
       return {
+        ...stat,
         hour: date.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }),
-        timestamp: date.getTime(),
-        critical: 0,
-        high: 0,
-        medium: 0,
-        low: 0,
-        total: 0,
       }
     })
-
-    // 2. Popula os buckets com os eventos
-    events.forEach((event) => {
-      // Arredonda a hora do evento para comparar com o bucket exato
-      const eventDate = new Date(event.timestamp)
-      eventDate.setMinutes(0, 0, 0) 
-      const eventHourTime = eventDate.getTime()
-
-      // Encontra o bucket correspondente àquela hora exata com .find() em vez de loop
-      const targetBucket = last24Hours.find(bucket => bucket.timestamp === eventHourTime)
-
-      if (targetBucket) {
-        targetBucket.total++
-        if (event.type === 'CRITICAL') targetBucket.critical++
-        else if (event.type === 'HIGH') targetBucket.high++
-        else if (event.type === 'MEDIUM') targetBucket.medium++
-        else if (event.type === 'LOW') targetBucket.low++
-      }
-    })
-
-    return last24Hours
-  }, [events])
+  }, [stats])
 
   return (
     <Card className="border-border bg-card">

@@ -4,12 +4,11 @@ import { useState, useMemo, useEffect } from 'react'
 import {
   RefreshCw,
   Filter,
+  Info,
   Search,
-  AlertTriangle,
   Activity,
-  Cpu,
-  Globe,
-  Clock,
+  AlertTriangle,
+  AlertCircle,
   ChevronLeft,
   ChevronRight
 } from 'lucide-react'
@@ -29,9 +28,10 @@ import { TopSources } from '@/components/top-sources'
 import { EventsTable } from '@/components/events-table'
 
 // Importando a nova função de busca paginada da API
-import { getPaginatedEvents } from '@/lib/api'
+import { getPaginatedEvents, getLast24hStats } from '@/lib/api'
+
 import { calculateStats } from '@/lib/mock-anomalies' 
-import type { Anomaly } from '@/types/index'
+import type { Anomaly, EventStatsCountResponseDto } from '@/types/index'
 
 export default function DashboardPage() {
   const [anomalies, setAnomalies] = useState<Anomaly[]>([])
@@ -48,15 +48,26 @@ export default function DashboardPage() {
   const [totalPages, setTotalPages] = useState(0)
   const [totalElements, setTotalElements] = useState(0)
   const pageSize = 10 // Puxando 10 itens por página conforme o padrão do seu Spring Boot
-
+  const [chartStats, setChartStats] = useState<EventStatsCountResponseDto[]>([])
+  
   // Função centralizada para buscar dados da API
   const fetchData = async (pageToFetch: number) => {
     try {
-      const response = await getPaginatedEvents(pageToFetch, pageSize)
+      // Faz as duas requisições em paralelo para maior performance
+      const [response, statsData] = await Promise.all([
+        getPaginatedEvents(pageToFetch, pageSize),
+        getLast24hStats()
+      ])
+
+      // Atualiza a tabela
       setAnomalies(response.anomalies)
       setTotalPages(response.totalPages)
       setTotalElements(response.totalElements)
       setCurrentPage(response.currentPage)
+      
+      // Atualiza o gráfico de 24h
+      setChartStats(statsData)
+
     } catch (error) {
       console.error('Erro ao buscar incidentes da API:', error)
     }
@@ -100,43 +111,39 @@ export default function DashboardPage() {
   const miniStats = [
     {
       label: 'Total de Eventos',
-      value: totalElements, // Exibe o total real de registros no banco de dados
+      value: totalElements, 
       change: 0,
       icon: <Activity className="w-5 h-5 text-primary" />,
       iconBgClass: 'bg-primary/10',
     },
     {
-      label: 'Alertas Criticos',
+      label: 'Alertas Críticos',
       value: stats.critical || 0,
       change: 0,
       icon: <AlertTriangle className="w-5 h-5 text-red-400" />,
       iconBgClass: 'bg-red-500/10',
     },
     {
-      label: 'Em Investigacao',
-      value: stats.investigating || 0,
+      label: 'Alertas Altos',
+      value: stats.high || 0,
       change: 0,
-      icon: <Search className="w-5 h-5 text-yellow-400" />,
+      icon: <AlertTriangle className="w-5 h-5 text-orange-400" />,
+      iconBgClass: 'bg-orange-500/10',
+    },
+    {
+      label: 'Alertas Médios',
+      value: stats.medium || 0,
+      change: 0,
+      icon: <AlertCircle className="w-5 h-5 text-yellow-400" />,
       iconBgClass: 'bg-yellow-500/10',
     },
     {
-      label: 'Ativos Monitorados',
-      value: '1', 
-      icon: <Cpu className="w-5 h-5 text-blue-400" />,
+      label: 'Alertas Baixos',
+      value: stats.low || 0,
+      change: 0,
+      icon: <Info className="w-5 h-5 text-blue-400" />,
       iconBgClass: 'bg-blue-500/10',
-    },
-    {
-      label: 'Origens Ativas',
-      value: '1', 
-      icon: <Globe className="w-5 h-5 text-green-400" />,
-      iconBgClass: 'bg-green-500/10',
-    },
-    {
-      label: 'Ultimo Scan',
-      value: 'Agora', 
-      icon: <Clock className="w-5 h-5 text-slate-400" />,
-      iconBgClass: 'bg-slate-500/10',
-    },
+    }
   ]
 
   if (isLoading) {
@@ -175,7 +182,9 @@ export default function DashboardPage() {
 
       <div className="grid lg:grid-cols-3 gap-6">
         <div className="lg:col-span-2">
-          <EventsChart events={anomalies} />
+          {/* ANTES: <EventsChart events={anomalies} /> */}
+          {/* AGORA: */}
+          <EventsChart stats={chartStats} />
         </div>
         <div>
           <SeverityChart stats={stats} />

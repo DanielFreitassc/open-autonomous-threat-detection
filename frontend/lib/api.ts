@@ -2,7 +2,7 @@ import axios from 'axios'
 import type { Anomaly } from '@/types/index'
 
 const api = axios.create({
-  baseURL: '/api/v1',
+  baseURL: 'http://localhost:8080/api/v1',
   headers: {
     'Content-Type': 'application/json',
   },
@@ -43,6 +43,19 @@ api.interceptors.response.use(
 // ==========================================
 // INTEGRAÇÃO COM O SPRING BOOT - EVENTOS
 // ==========================================
+export interface EventStatsCountResponseDto {
+  timestamp: string;
+  critical: number;
+  high: number;
+  medium: number;
+  low: number;
+}
+
+export async function getLast24hStats() {
+  const { data } = await api.get<EventStatsCountResponseDto[]>('/events/stats/last-24h');
+  return data;
+}
+
 export interface SpringEvent {
   events: { id: string; timestamp: string; category: string; type: string; outcome: string }
   httpRequests: Array<{ id?: string; method: string; endpoint: string; statusCode: string; bodySize: string; protocol: string }>

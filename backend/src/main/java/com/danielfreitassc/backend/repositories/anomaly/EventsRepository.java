@@ -1,5 +1,7 @@
 package com.danielfreitassc.backend.repositories.anomaly;
 
+import java.time.LocalDateTime;
+import java.util.List;
 import java.util.UUID;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
@@ -13,7 +15,7 @@ import com.danielfreitassc.backend.models.anomaly.EventsEntity;
 public interface EventsRepository extends JpaRepository<EventsEntity, UUID> {
 
     Page<EventsEntity> findByFalsePositiveFalse(Pageable pageable);
-
+    List<EventsEntity> findByTimestampAfterAndFalsePositiveFalseOrderByTimestampAsc(LocalDateTime timestamp);
     @Modifying
     @Query("UPDATE events e SET e.falsePositive = :status WHERE e.id IN " +
            "(SELECT h.eventsEntity.id FROM http_requests h " + 

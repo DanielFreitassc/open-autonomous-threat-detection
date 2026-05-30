@@ -3,13 +3,13 @@ spring:
     name: backend
   datasource:
     #url: jdbc:h2:mem:/db
-    url: ${SPRING_DATASOURCE_URL:jdbc:h2:mem:/db}
-    username: ${DB_USER:admin}
-    password: ${DB_PASS:admin}
+    url: jdbc:postgresql://localhost:5432/db
+    username: admin
+    password: admin
     
   jpa:
     hibernate:
-      ddl-auto: update
+      ddl-auto: create
 
 api:
  security:
