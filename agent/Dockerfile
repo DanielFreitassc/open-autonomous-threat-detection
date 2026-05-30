@@ -4,6 +4,9 @@ FROM python:3.11-slim-bookworm
 # Cria um usuário não-root (Boas práticas de segurança do Docker)
 RUN groupadd -r agentgroup && useradd -r -g agentgroup -d /app -s /sbin/nologin agentuser
 
+# AJUSTE: Cria o diretório de trabalho explicitamente e repassa a propriedade ao novo usuário
+RUN mkdir -p /app && chown -R agentuser:agentgroup /app
+
 # Define o diretório de trabalho
 WORKDIR /app
 

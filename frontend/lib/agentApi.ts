@@ -1,7 +1,7 @@
 import axios from 'axios'
 
 const agentApi = axios.create({
-  baseURL: process.env.NEXT_PUBLIC_AGENT_API_URL || '/api',
+  baseURL: '/api',
   headers: {
     'Content-Type': 'application/json',
   },
